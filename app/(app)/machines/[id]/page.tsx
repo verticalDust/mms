@@ -1,26 +1,56 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, isNull, inArray } from "drizzle-orm";
-import { ArrowLeft, MapPin, OctagonX, CircleDot, Plus } from "lucide-react";
+import { and, asc, desc, eq, isNull, inArray, sql } from "drizzle-orm";
+import {
+  ArrowLeft,
+  MapPin,
+  OctagonX,
+  CircleDot,
+  Plus,
+  Pencil,
+  Printer,
+  Ban,
+  Undo2,
+  PauseCircle,
+  Trash2,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { machines, downtimePeriods, workOrders } from "@/lib/db/schema";
-import { getMachineStatus } from "@/lib/queries";
+import {
+  machines,
+  downtimePeriods,
+  workOrders,
+  workOrderParts,
+  pmSchedules,
+} from "@/lib/db/schema";
+import { getMachineStatus, listMachineParts } from "@/lib/queries";
 import { buttonClass, Mono, SectionLabel, EmptyState } from "@/components/ui";
 import {
   MachineStatusChip,
   WorkStatusChip,
   PriorityChip,
+  StatusChip,
+  StockStatusChip,
 } from "@/components/status-chip";
+import { QrImage } from "@/components/qr";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 import { downtimeSince, formatDuration, formatDate } from "@/lib/format";
-import { markDown, markRunning } from "../actions";
+import { qrSvg } from "@/lib/qr";
+import { appBaseUrl, machineScanPath } from "@/lib/url";
+import {
+  markDown,
+  markRunning,
+  retireMachine,
+  unretireMachine,
+  removePart,
+} from "../actions";
 
 export default async function MachineDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -32,13 +62,13 @@ export default async function MachineDetailPage({
   if (!machine) notFound();
 
   const status = await getMachineStatus(id);
+  const isAdmin = user.role === "admin";
+  const retired = status === "retired";
 
   const [openPeriod] = await db
     .select()
     .from(downtimePeriods)
-    .where(
-      and(eq(downtimePeriods.machineId, id), isNull(downtimePeriods.endedAt)),
-    )
+    .where(and(eq(downtimePeriods.machineId, id), isNull(downtimePeriods.endedAt)))
     .limit(1);
 
   const openJobs = await db
@@ -52,12 +82,49 @@ export default async function MachineDetailPage({
     )
     .orderBy(desc(workOrders.dueDate));
 
+  const doneJobs = await db
+    .select()
+    .from(workOrders)
+    .where(and(eq(workOrders.machineId, id), eq(workOrders.status, "done")))
+    .orderBy(desc(workOrders.completedAt))
+    .limit(10);
+
+  // Parts consumed per completed job (invariant #1 lines, reversals excluded).
+  const doneIds = doneJobs.map((j) => j.id);
+  const partCountRows = doneIds.length
+    ? await db
+        .select({
+          woId: workOrderParts.workOrderId,
+          c: sql<number>`count(*)`,
+        })
+        .from(workOrderParts)
+        .where(
+          and(
+            inArray(workOrderParts.workOrderId, doneIds),
+            eq(workOrderParts.reversed, false),
+          ),
+        )
+        .groupBy(workOrderParts.workOrderId)
+    : [];
+  const partCounts = new Map(partCountRows.map((r) => [r.woId, Number(r.c)]));
+
+  const attachedParts = await listMachineParts(id);
+
+  const schedules = await db
+    .select()
+    .from(pmSchedules)
+    .where(eq(pmSchedules.machineId, id))
+    .orderBy(asc(pmSchedules.nextDueDate));
+
   const history = await db
     .select()
     .from(downtimePeriods)
     .where(eq(downtimePeriods.machineId, id))
     .orderBy(desc(downtimePeriods.startedAt))
     .limit(10);
+
+  const scanUrl = (await appBaseUrl()) + machineScanPath(machine.code);
+  const svg = await qrSvg(scanUrl, { margin: 2 });
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,9 +136,17 @@ export default async function MachineDetailPage({
         Machines
       </Link>
 
-      {/* Nameplate header */}
+      {retired && (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[14px] text-slate-600">
+          <Ban className="h-4 w-4 shrink-0" />
+          This machine is retired — kept for its history, and it won&rsquo;t take
+          new work.
+        </div>
+      )}
+
+      {/* Nameplate header + QR-as-motif */}
       <div className="rounded-xl border border-slate-200 bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <Mono className="text-[13px] font-medium text-slate-500">
               {machine.code}
@@ -85,20 +160,45 @@ export default async function MachineDetailPage({
                 {machine.location}
               </div>
             )}
+            <div className="mt-3 flex items-center gap-2">
+              <MachineStatusChip status={status} />
+              {status === "down" && openPeriod && (
+                <span className="text-[13px] text-red-600">
+                  <Mono>{downtimeSince(openPeriod.startedAt)}</Mono>
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <MachineStatusChip status={status} />
-            {status === "down" && openPeriod && (
-              <span className="text-[13px] text-red-600">
-                <Mono>{downtimeSince(openPeriod.startedAt)}</Mono>
+
+          {/* Asset-tag: the same QR the physical label carries. */}
+          <div className="flex shrink-0 items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
+            <QrImage
+              svg={svg}
+              className="h-24 w-24"
+              label={`QR code linking to machine ${machine.code}`}
+            />
+            <div className="flex flex-col">
+              <span className="font-condensed text-[12px] tracking-wide text-slate-500">
+                Scan to report
               </span>
-            )}
+              <Mono className="text-[13px] text-slate-700">{machine.code}</Mono>
+              {isAdmin && !retired && (
+                <Link
+                  href={`/print/labels?ids=${machine.id}`}
+                  className="mt-2 inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print label
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
-        {status !== "retired" && (
-          <div className="mt-4 border-t border-slate-100 pt-4">
-            {status === "down" ? (
+        {/* Actions */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+          {!retired &&
+            (status === "down" ? (
               <form action={markRunning}>
                 <input type="hidden" name="machineId" value={machine.id} />
                 <button type="submit" className={buttonClass("primary")}>
@@ -114,9 +214,43 @@ export default async function MachineDetailPage({
                   Mark down
                 </button>
               </form>
-            )}
-          </div>
-        )}
+            ))}
+
+          {isAdmin && (
+            <Link
+              href={`/machines/${machine.id}/edit`}
+              className={buttonClass("secondary")}
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Link>
+          )}
+
+          {isAdmin &&
+            (retired ? (
+              <form action={unretireMachine}>
+                <input type="hidden" name="machineId" value={machine.id} />
+                <ConfirmSubmit
+                  variant="secondary"
+                  icon={<Undo2 className="h-4 w-4" />}
+                  message="Bring this machine back into service?"
+                >
+                  Return to service
+                </ConfirmSubmit>
+              </form>
+            ) : (
+              <form action={retireMachine} className="sm:ml-auto">
+                <input type="hidden" name="machineId" value={machine.id} />
+                <ConfirmSubmit
+                  variant="secondary"
+                  icon={<Ban className="h-4 w-4" />}
+                  message="Retire this machine? It leaves the active lists and stops taking new work. Its history is kept, and you can return it to service later."
+                >
+                  Retire
+                </ConfirmSubmit>
+              </form>
+            ))}
+        </div>
       </div>
 
       {machine.notes && (
@@ -128,17 +262,110 @@ export default async function MachineDetailPage({
         </div>
       )}
 
+      {/* Parts (fitment — E2-S8/S9) */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <SectionLabel>Parts</SectionLabel>
+          {isAdmin && !retired && (
+            <Link
+              href={`/machines/${machine.id}/parts/new`}
+              className="inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add part
+            </Link>
+          )}
+        </div>
+        {attachedParts.length === 0 ? (
+          <EmptyState
+            title="No parts recorded for this machine yet."
+            action={
+              isAdmin && !retired ? (
+                <Link
+                  href={`/machines/${machine.id}/parts/new`}
+                  className={buttonClass("secondary")}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add part
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {attachedParts.map((p) => (
+              <div
+                key={p.linkId}
+                className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
+              >
+                <Link
+                  href={`/parts/${p.partId}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 hover:opacity-80"
+                >
+                  <Mono className="w-24 shrink-0 text-[13px] text-slate-500">
+                    {p.sku}
+                  </Mono>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] text-slate-900">
+                      {p.name}
+                    </div>
+                    {(p.binLocation || p.quantity != null || p.note) && (
+                      <div className="truncate text-[13px] text-slate-500">
+                        {p.binLocation && (
+                          <>
+                            bin <Mono>{p.binLocation}</Mono>
+                          </>
+                        )}
+                        {p.quantity != null && (
+                          <>
+                            {p.binLocation ? " · " : ""}qty{" "}
+                            <Mono>{p.quantity}</Mono>
+                          </>
+                        )}
+                        {p.note && (
+                          <>
+                            {p.binLocation || p.quantity != null ? " · " : ""}
+                            {p.note}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Link>
+                <Mono className="text-[14px] text-slate-900">{p.onHand}</Mono>
+                <StockStatusChip level={p.stock} />
+                {isAdmin && (
+                  <form action={removePart}>
+                    <input type="hidden" name="linkId" value={p.linkId} />
+                    <input type="hidden" name="machineId" value={machine.id} />
+                    <input type="hidden" name="partId" value={p.partId} />
+                    <ConfirmSubmit
+                      compact
+                      label={`Remove ${p.sku}`}
+                      icon={<Trash2 className="h-4 w-4" />}
+                      message={`Remove ${p.sku} from this machine? Only the link is removed — the part and its stock history stay.`}
+                    />
+                  </form>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Open work */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <SectionLabel>Open work orders</SectionLabel>
-          <Link
-            href={`/work-orders/new?machine=${machine.id}`}
-            className="inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New
-          </Link>
+          {!retired && (
+            <Link
+              href={`/work-orders/new?machine=${machine.id}`}
+              className="inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              New
+            </Link>
+          )}
         </div>
         {openJobs.length === 0 ? (
           <EmptyState title="No open work orders on this machine." />
@@ -164,6 +391,76 @@ export default async function MachineDetailPage({
         )}
       </div>
 
+      {/* Completed work */}
+      <div className="flex flex-col gap-3">
+        <SectionLabel>Completed work</SectionLabel>
+        {doneJobs.length === 0 ? (
+          <EmptyState title="No completed work orders yet." />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {doneJobs.map((wo) => {
+              const n = partCounts.get(wo.id) ?? 0;
+              return (
+                <Link
+                  key={wo.id}
+                  href={`/work-orders/${wo.id}`}
+                  className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50"
+                >
+                  <Mono className="w-16 shrink-0 text-[13px] text-slate-500">
+                    WO-{wo.id}
+                  </Mono>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] text-slate-900">
+                      {wo.title}
+                    </div>
+                    <div className="truncate text-[13px] text-slate-500">
+                      {wo.completedAt ? formatDate(wo.completedAt) : "—"}
+                      {n > 0 && ` · ${n} part${n === 1 ? "" : "s"} used`}
+                    </div>
+                  </div>
+                  <WorkStatusChip status="done" />
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Preventive maintenance */}
+      <div className="flex flex-col gap-3">
+        <SectionLabel>Preventive maintenance</SectionLabel>
+        {schedules.length === 0 ? (
+          <EmptyState title="No preventive maintenance scheduled." />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+            {schedules.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[15px] text-slate-900">
+                    {s.title}
+                  </div>
+                  <div className="text-[13px] text-slate-500">
+                    Every {s.intervalDays} days
+                  </div>
+                </div>
+                {s.paused ? (
+                  <StatusChip tone="slate" icon={PauseCircle}>
+                    Paused
+                  </StatusChip>
+                ) : (
+                  <span className="text-[13px] text-slate-500">
+                    Next <Mono>{formatDate(s.nextDueDate)}</Mono>
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Downtime history */}
       <div className="flex flex-col gap-3">
         <SectionLabel>Downtime history</SectionLabel>
@@ -178,7 +475,7 @@ export default async function MachineDetailPage({
               >
                 <div className="text-slate-700">
                   {formatDate(p.startedAt)}{" "}
-                  <span className="text-slate-400">
+                  <span className="text-slate-500">
                     {p.startedAt.toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",

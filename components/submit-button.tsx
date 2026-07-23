@@ -20,7 +20,7 @@ export function SubmitButton({
     <button
       type="submit"
       disabled={pending}
-      className={cn(buttonClass(variant, full))}
+      className={cn(buttonClass(variant, full, "lg"))}
     >
       {pending && <Loader2 className="h-4 w-4 animate-spin" />}
       {children}

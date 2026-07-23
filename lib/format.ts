@@ -14,6 +14,33 @@ export function formatDuration(ms: number): string {
   return `${m}m`;
 }
 
+// Start of today, local time, as epoch ms. Due dates are stored day-granular
+// (local midnight), so "overdue" is measured against this, not the wall clock.
+export function startOfLocalDay(d: Date = new Date()): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+export type DueState =
+  | { kind: "none" }
+  | { kind: "overdue"; days: number }
+  | { kind: "today" }
+  | { kind: "future"; date: Date };
+
+// Day-granular due classification shared by the queue AND the dashboard so
+// "overdue" means the same thing everywhere: a job due today is due, not late;
+// overdue is strictly before today, measured in whole days.
+export function dueState(
+  dueDate: Date | null,
+  startOfToday: number,
+): DueState {
+  if (!dueDate) return { kind: "none" };
+  const due = dueDate.getTime();
+  if (due < startOfToday)
+    return { kind: "overdue", days: Math.round((startOfToday - due) / 86_400_000) };
+  if (due < startOfToday + 86_400_000) return { kind: "today" };
+  return { kind: "future", date: dueDate };
+}
+
 // Date in the factory timezone (falls back to the runtime zone if invalid).
 export function formatDate(date: Date, timezone?: string): string {
   try {

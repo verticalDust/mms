@@ -15,9 +15,13 @@ const buttonVariants = {
 export function buttonClass(
   variant: keyof typeof buttonVariants = "secondary",
   full = false,
+  // "lg" = 56px, the DESIGN.md height for a screen's pinned primary action
+  // (thumb reach). Default 44px meets the touch minimum for everything else.
+  size: "md" | "lg" = "md",
 ) {
   return cn(
-    "inline-flex items-center justify-center gap-2 rounded-md px-4 h-11 min-h-11 text-[15px] font-medium transition-colors cursor-pointer",
+    "inline-flex items-center justify-center gap-2 rounded-md px-4 text-[15px] font-medium transition-colors cursor-pointer",
+    size === "lg" ? "h-14 min-h-14" : "h-11 min-h-11",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1",
     "disabled:cursor-not-allowed disabled:opacity-60",
     buttonVariants[variant],

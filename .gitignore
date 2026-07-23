@@ -45,6 +45,7 @@ next-env.d.ts
 /data/*.db-*
 /data/*.sqlite*
 /public/uploads/
+/uploads/
 
 # impeccable local runtime
 .impeccable/

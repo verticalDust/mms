@@ -43,7 +43,7 @@ This is positioned against heavy, expensive enterprise CMMS platforms: MMS wins 
 
 ## Capabilities and Constraints
 
-**Capabilities (v0 scope, by epic):** secure multi-user foundation with two enforced roles; machine register with status, history, QR labels, and retirement; spare-parts catalog with an append-only movement ledger and a low-stock reorder list; a unified work-order queue (breakdowns + planned) that consumes parts; self-generating preventive-maintenance schedules; a no-login public report form with a triage queue; a planner dashboard and daily views plus a daily digest email.
+**Capabilities (v0 scope, by epic):** secure multi-user foundation with two enforced roles; machine register with status, history, QR labels, and retirement; spare-parts catalog with an append-only movement ledger and a low-stock reorder list; a per-machine spares list ("machine parts") linking each machine to the parts it uses; a unified work-order queue (breakdowns + planned) that consumes parts; self-generating preventive-maintenance schedules; a no-login public report form with a triage queue; a planner dashboard and daily views plus a daily digest email.
 
 **Durable constraints:**
 - Single small VPS; low running cost is a product requirement, not just an implementation detail.
@@ -52,7 +52,7 @@ This is positioned against heavy, expensive enterprise CMMS platforms: MMS wins 
 - English UI in v0, fully externalized strings; the **public report form also ships in Bulgarian** in v0 (the least English-fluent persona uses it); broader localization is later.
 - Explicitly **out of v0:** offline mode/sync, native app, purchasing/PO loop, analytics (MTBF/MTTR), and multi-tenant SaaS packaging — deferred to later phases.
 
-**Terminology:** machine, part (SKU), work order, PM schedule, downtime period, stock movement (receive/issue/adjust/reverse), report, triage.
+**Terminology:** machine, part (SKU), work order, PM schedule, downtime period, stock movement (receive/issue/adjust/reverse), report, triage, machine parts (the spares a machine uses — the industry's *bill of materials*).
 
 **Open product decisions:** commercial trajectory (see Positioning); pilot factory characterization (see Operating Context); password-reset path (self-serve email vs admin temporary password); production domain name.
 

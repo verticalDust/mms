@@ -9,6 +9,7 @@ import {
   StatusChip,
 } from "@/components/status-chip";
 import { OctagonX, TriangleAlert, Clock, Inbox, ClipboardList } from "lucide-react";
+import { startOfLocalDay, dueState } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export const metadata = { title: "Dashboard · MMS" };
@@ -60,22 +61,15 @@ function Gauge({
 export default async function DashboardPage() {
   await requireUser();
   const counts = await getDashboardCounts();
-  const now = Date.now();
+  const startOfToday = startOfLocalDay();
 
+  // Overdue-first: earliest due (most overdue) on top, undated last — the same
+  // ordering and day-granular "overdue" the full queue uses (lib/format).
   const queue = (await listWorkOrders(["open", "in_progress"]))
-    .map((r) => ({
-      ...r,
-      overdueMs:
-        r.dueDate && r.dueDate.getTime() < now
-          ? now - r.dueDate.getTime()
-          : 0,
-    }))
-    .sort((a, b) => {
-      if (a.overdueMs !== b.overdueMs) return b.overdueMs - a.overdueMs;
-      const ad = a.dueDate?.getTime() ?? Infinity;
-      const bd = b.dueDate?.getTime() ?? Infinity;
-      return ad - bd;
-    })
+    .sort(
+      (a, b) =>
+        (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity),
+    )
     .slice(0, 8);
 
   return (
@@ -161,44 +155,52 @@ export default async function DashboardPage() {
           />
         ) : (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            {queue.map((wo) => (
-              <Link
-                key={wo.id}
-                href={`/work-orders/${wo.id}`}
-                className={cn(
-                  "flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50",
-                  wo.overdueMs > 0 && "border-l-[3px] border-l-red-600",
-                )}
-              >
-                <Mono className="w-16 shrink-0 text-[13px] text-slate-500">
-                  WO-{wo.id}
-                </Mono>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[15px] text-slate-900">
-                    {wo.title}
-                  </div>
-                  <div className="truncate text-[13px] text-slate-500">
-                    <Mono>{wo.machineCode}</Mono> · {wo.machineName}
-                  </div>
-                </div>
-                <PriorityChip priority={wo.priority} />
-                <WorkStatusChip status={wo.status} />
-                <div className="w-24 shrink-0 text-right">
-                  {wo.overdueMs > 0 ? (
-                    <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
-                      <Clock className="h-3.5 w-3.5" />
-                      <Mono>{Math.floor(wo.overdueMs / 86_400_000)}d</Mono> over
-                    </span>
-                  ) : wo.dueDate ? (
-                    <Mono className="text-[13px] text-slate-500">
-                      {wo.dueDate.toLocaleDateString()}
-                    </Mono>
-                  ) : (
-                    <span className="text-[13px] text-slate-400">—</span>
+            {queue.map((wo) => {
+              const ds = dueState(wo.dueDate, startOfToday);
+              return (
+                <Link
+                  key={wo.id}
+                  href={`/work-orders/${wo.id}`}
+                  className={cn(
+                    "flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50",
+                    ds.kind === "overdue" && "border-l-[3px] border-l-red-600",
                   )}
-                </div>
-              </Link>
-            ))}
+                >
+                  <Mono className="w-16 shrink-0 text-[13px] text-slate-500">
+                    WO-{wo.id}
+                  </Mono>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] text-slate-900">
+                      {wo.title}
+                    </div>
+                    <div className="truncate text-[13px] text-slate-500">
+                      <Mono>{wo.machineCode}</Mono> · {wo.machineName}
+                    </div>
+                  </div>
+                  <PriorityChip priority={wo.priority} />
+                  <WorkStatusChip status={wo.status} />
+                  <div className="w-24 shrink-0 text-right">
+                    {ds.kind === "overdue" ? (
+                      <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
+                        <Clock className="h-3.5 w-3.5" />
+                        <Mono>{ds.days}d</Mono> over
+                      </span>
+                    ) : ds.kind === "today" ? (
+                      <span className="inline-flex items-center gap-1 text-[13px] text-amber-700">
+                        <Clock className="h-3.5 w-3.5" />
+                        Due today
+                      </span>
+                    ) : ds.kind === "future" ? (
+                      <Mono className="text-[13px] text-slate-500">
+                        {ds.date.toLocaleDateString()}
+                      </Mono>
+                    ) : (
+                      <span className="text-[13px] text-slate-400">—</span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

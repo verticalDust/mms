@@ -127,6 +127,26 @@ export function PriorityChip({
   );
 }
 
+export function StockStatusChip({ level }: { level: "out" | "low" | "ok" }) {
+  if (level === "out")
+    return (
+      <StatusChip tone="red" icon={OctagonX}>
+        Out
+      </StatusChip>
+    );
+  if (level === "low")
+    return (
+      <StatusChip tone="amber" icon={TriangleAlert}>
+        Low
+      </StatusChip>
+    );
+  return (
+    <StatusChip tone="green" icon={CircleCheck}>
+      OK
+    </StatusChip>
+  );
+}
+
 // The green-flip: a zero/all-clear count renders as reassurance, not a dead 0.
 export function ClearChip({ children }: { children: React.ReactNode }) {
   return (

@@ -8,6 +8,13 @@
       "when": 1784729972377,
       "tag": "0000_violet_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784801716216,
+      "tag": "0001_known_dagger",
+      "breakpoints": true
     }
   ]
 }

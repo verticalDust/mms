@@ -72,8 +72,8 @@ Each is the shared list pattern with a specific row shape, filters, and empty st
 
 ## 4. Detail family (inherit §1 nameplate header + history sections)
 
-- **4.1 Machine detail — `E1-S3`.** Nameplate header (code, name, location, StatusChip) + **QR-as-motif** block (code + QR, asset-tag styling). Sections: Down/Running toggle (opens/closes the single downtime period, with live timer when down); open work orders; upcoming/overdue PMs; completed jobs newest-first with parts each consumed. Every empty section states it plainly (E1-S3). Retire action (Admin) → leaves default lists, history stays, PMs pause, new WOs refused. **Print label** action → §8.
-- **4.2 Part detail (movement ledger) — `E2-S6`.** Nameplate header (SKU, name, bin, photo, on-hand vs min StatusChip). The hero is the **movement ledger**: every receive/issue/adjust/reverse, newest-first, with type, mono qty, actor, timestamp, and a link to the work order where applicable — and the running figures **sum exactly to on-hand** (invariant made visible via the aligned mono column). Actions (Admin): Receive / Issue / Adjust → §6 dialogs.
+- **4.1 Machine detail — `E1-S3` (+ `E2-S8/S9`).** Nameplate header (code, name, location, StatusChip) + **QR-as-motif** block (code + QR, asset-tag styling). Sections: Down/Running toggle (opens/closes the single downtime period, with live timer when down); open work orders; upcoming/overdue PMs; completed jobs newest-first with parts each consumed; a **Parts** section (`E2-S8/S9`, new v0 scope — PLAN §6) — the spares this machine uses: each row = mono SKU + name + on-hand/min with a Low/OK chip + bin + optional qty/note, whole-row tap-through to the part; **Admin** gets *Add part* (dialog: parts-catalog search by SKU/name + optional qty/note → Attach; duplicate rejected) and *Remove* (confirm; unlinks only — part + stock history untouched); a retired machine keeps the list read-only. Every empty section states it plainly (E1-S3). Retire action (Admin) → leaves default lists, history stays, PMs pause, new WOs refused. **Print label** action → §8.
+- **4.2 Part detail (movement ledger) — `E2-S6`.** Nameplate header (SKU, name, bin, photo, on-hand vs min StatusChip). The hero is the **movement ledger**: every receive/issue/adjust/reverse, newest-first, with type, mono qty, actor, timestamp, and a link to the work order where applicable — and the running figures **sum exactly to on-hand** (invariant made visible via the aligned mono column). Plus a **Fits machines** section (`E2-S10`, PLAN §6) — the machines that use this part, each tapping through to the machine page. Actions (Admin): Receive / Issue / Adjust → §6 dialogs.
 
 ---
 
@@ -142,6 +142,6 @@ One shared dialog shell, three modes, launched from part detail / low-stock:
 
 ## Cross-reference & open decisions rollup
 
-- **Build order** (from PLAN.md): §2 auth (wk1) → §3.1/4.1/8 machines (wk2) → §3.2/4.2/6 parts + §3.3 queue (wk3) → §5 work orders incl. ★5.2 (wk4) → §3.6 PM + §7 public + §3.7 triage (wk5) → dashboard + Today/week + digest (wk6).
+- **Build order** (from PLAN.md): §2 auth (wk1) → §3.1/4.1/8 machines (wk2) → §3.2/4.2/6 parts + §3.3 queue + machine-parts fitment (E2-S8/S9, §4.1 Parts section) (wk3) → §5 work orders incl. ★5.2 + machine-parts job tie-in (E2-S10, §4.2 Fits machines) (wk4) → §3.6 PM + §7 public + §3.7 triage (wk5) → dashboard + Today/week + digest (wk6).
 - **Consolidated open decisions** for the build: D6 password path (§2.3); demo-seed on setup (§2.2); email config location (§2.5); WO-detail mobile tabs-vs-scroll + post-Done part edits (§5.2); public-form default language + photo order (§7.1); A4 label grid (§8). None block starting the walking skeleton.
 - **Locked:** planner dashboard brief (approved) and all §1 conventions.

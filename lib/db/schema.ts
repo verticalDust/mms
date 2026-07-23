@@ -130,6 +130,32 @@ export const parts = sqliteTable(
   (t) => [index('parts_sku_idx').on(t.sku)],
 )
 
+// Fitment (E2-S8/S9, PLAN §6): which spare parts a machine uses — the industry's
+// bill of materials. Informational and DECOUPLED from the stock ledger; a link
+// row never touches on_hand or stock_movements. unique(machine_id, part_id) keeps
+// a part attached at most once; deleting a link removes only the row.
+export const machineParts = sqliteTable(
+  'machine_parts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    machineId: integer('machine_id')
+      .notNull()
+      .references(() => machines.id),
+    partId: integer('part_id')
+      .notNull()
+      .references(() => parts.id),
+    quantity: integer('quantity'), // how many the machine uses (nullable)
+    note: text('note'), // e.g. position — "front bearing"
+    createdBy: integer('created_by').references(() => users.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('machine_parts_unq').on(t.machineId, t.partId),
+    index('machine_parts_machine_idx').on(t.machineId),
+    index('machine_parts_part_idx').on(t.partId),
+  ],
+)
+
 // Append-only. `quantity` is a SIGNED delta (+receive, −issue, ±adjust,
 // reversal = negation of the referenced movement). SUM(quantity) == parts.onHand.
 // Corrections are new reversing rows — nothing is ever updated or deleted.
@@ -305,3 +331,4 @@ export type Part = typeof parts.$inferSelect
 export type WorkOrder = typeof workOrders.$inferSelect
 export type StockMovement = typeof stockMovements.$inferSelect
 export type DowntimePeriod = typeof downtimePeriods.$inferSelect
+export type MachinePart = typeof machineParts.$inferSelect
