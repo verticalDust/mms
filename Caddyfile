@@ -1,0 +1,5 @@
+# Automatic HTTPS via Let's Encrypt (E0-S1). {$DOMAIN} comes from compose env.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:3000
+}

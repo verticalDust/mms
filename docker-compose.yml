@@ -1,0 +1,39 @@
+# MMS pilot stack: one app container + Caddy for automatic HTTPS.
+# `docker compose up -d` on the VPS. Set DOMAIN in a .env next to this file.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=file:/app/data/mms.db
+      - NODE_ENV=production
+      # Mail relay (Brevo) for digest + password reset — fill in when ready.
+      # - SMTP_HOST=smtp-relay.brevo.com
+      # - SMTP_PORT=587
+      # - SMTP_USER=
+      # - SMTP_PASS=
+      # - MAIL_FROM=
+    volumes:
+      - ./data:/app/data
+      - ./uploads:/app/public/uploads
+    expose:
+      - "3000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
