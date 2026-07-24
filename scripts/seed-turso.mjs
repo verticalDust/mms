@@ -17,12 +17,16 @@ import { createClient } from "@libsql/client";
 import bcrypt from "bcryptjs";
 
 const SOURCE_URL = process.env.SOURCE_DATABASE_URL ?? "file:./data/mms.db";
-const DEST_URL = process.env.TURSO_DATABASE_URL;
-const DEST_TOKEN = process.env.TURSO_AUTH_TOKEN;
+// Target: accept either the Turso-integration names or the app's own names.
+const DEST_URL = process.env.TURSO_DATABASE_URL ?? process.env.DATABASE_URL;
+const DEST_TOKEN =
+  process.env.TURSO_AUTH_TOKEN ?? process.env.DATABASE_AUTH_TOKEN;
 const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? "demo-mms-2026";
 
-if (!DEST_URL) {
-  console.error("Set TURSO_DATABASE_URL (and TURSO_AUTH_TOKEN) first.");
+if (!DEST_URL || DEST_URL.startsWith("file:")) {
+  console.error(
+    "Set TURSO_DATABASE_URL/DATABASE_URL (and its token) to your remote Turso DB first.",
+  );
   process.exit(1);
 }
 

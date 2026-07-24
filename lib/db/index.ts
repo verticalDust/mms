@@ -6,12 +6,14 @@ import * as schema from './schema'
 // DATABASE_URL is set (any serverless deploy — e.g. Vercel), the local SQLite
 // file in dev. In production a missing URL is a hard error, not a silent fall
 // back to a local file that can't exist on a read-only serverless filesystem.
+// DATABASE_URL is the app's own var; TURSO_DATABASE_URL is what Vercel's Turso
+// integration injects — accept either so both wiring paths work.
 function resolveUrl(): string {
-  const url = process.env.DATABASE_URL
+  const url = process.env.DATABASE_URL ?? process.env.TURSO_DATABASE_URL
   if (url) return url
   if (process.env.NODE_ENV === 'production')
     throw new Error(
-      'DATABASE_URL is required in production — set your Turso database URL.',
+      'DATABASE_URL (or TURSO_DATABASE_URL) is required in production — set your Turso database URL.',
     )
   return 'file:./data/mms.db'
 }
@@ -20,7 +22,7 @@ function makeDb() {
   const client = createClient({
     url: resolveUrl(),
     // Set for a remote Turso DB; undefined (ignored) for a local file.
-    authToken: process.env.DATABASE_AUTH_TOKEN,
+    authToken: process.env.DATABASE_AUTH_TOKEN ?? process.env.TURSO_AUTH_TOKEN,
     // SQLite busy-timeout (ms) for the local file: each write transaction runs
     // BEGIN IMMEDIATE and takes its own connection, so overlapping writers
     // contend for the single write lock; 5s lets a loser wait its turn instead

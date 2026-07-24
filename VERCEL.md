@@ -15,6 +15,13 @@ selects Turso; `BLOB_READ_WRITE_TOKEN` selects Blob). Nothing to change in code.
 You need a **Turso** account and a **Vercel** account (both free). The repo is
 already on GitHub, so Vercel deploys straight from it.
 
+> **Using Vercel's Turso integration?** (Vercel → Storage → Create → Turso.)
+> It provisions the DB and sets `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` on the
+> project automatically — the app reads those, so you can **skip §1 and the
+> env-var half of §4**. You still need to load the schema + data (§2, using
+> those values) and add a Blob store (§3). Grab the URL/token from the store's
+> **`.env.local`** tab, or run `vercel env pull .env.development.local`.
+
 ---
 
 ## 1. Create the Turso database
@@ -66,8 +73,11 @@ return a 500 on Vercel (read-only FS); with it, they go to Blob.
 
 1. vercel.com/new → import this GitHub repo (framework auto-detects as Next.js).
 2. Project → **Settings → Environment Variables**, add (Production + Preview):
-   - `DATABASE_URL` = `libsql://mms-<org>.turso.io`
-   - `DATABASE_AUTH_TOKEN` = `<token>`
+   - `DATABASE_URL` = `libsql://mms-<org>.turso.io` — **skip if you used the
+     Turso integration**, which already set `TURSO_DATABASE_URL` (the app reads
+     either name).
+   - `DATABASE_AUTH_TOKEN` = `<token>` — likewise, the integration sets
+     `TURSO_AUTH_TOKEN`.
    - `BLOB_READ_WRITE_TOKEN` — added by step 3; confirm it's present.
    - `APP_URL` = `https://<your-app>.vercel.app` *(optional — used for absolute
      QR links; the app otherwise derives it from request headers.)*
