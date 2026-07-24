@@ -1,8 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
-import { ArrowLeft, Play, Check, Plus, Package, Trash2 } from "lucide-react";
+import { asc, desc, eq } from "drizzle-orm";
+import {
+  ArrowLeft,
+  Play,
+  Check,
+  Plus,
+  Package,
+  Trash2,
+  CheckCircle2,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { can } from "@/lib/auth/rbac";
 import { db } from "@/lib/db";
 import {
   workOrders,
@@ -10,7 +19,13 @@ import {
   users,
   workOrderStatusHistory,
 } from "@/lib/db/schema";
-import { listWorkOrderParts, listWorkOrderPhotos } from "@/lib/queries";
+import {
+  listWorkOrderParts,
+  listWorkOrderPhotos,
+  listChecklistItems,
+  openDowntimeFor,
+  downtimeResolvedBy,
+} from "@/lib/queries";
 import {
   buttonClass,
   Mono,
@@ -20,9 +35,17 @@ import {
 } from "@/components/ui";
 import { WorkStatusChip, PriorityChip } from "@/components/status-chip";
 import { ConfirmSubmit } from "@/components/confirm-submit";
-import { formatDate } from "@/lib/format";
+import {
+  formatDate,
+  toDateInputValue,
+  downtimeSince,
+  formatDuration,
+} from "@/lib/format";
 import { startWork, completeWork, removePartFromJob } from "../actions";
 import { JobPhotos } from "./job-photos";
+import { PlanRow } from "./plan-row";
+import { Checklist } from "./checklist";
+import { DowntimePrompt } from "./downtime-prompt";
 
 export default async function WorkOrderDetailPage({
   params,
@@ -46,6 +69,7 @@ export default async function WorkOrderDetailPage({
       machineId: machines.id,
       machineCode: machines.code,
       machineName: machines.name,
+      assigneeId: workOrders.assigneeId,
       assigneeName: users.name,
     })
     .from(workOrders)
@@ -82,6 +106,31 @@ export default async function WorkOrderDetailPage({
   // or cancelled job's record of what was used is locked.
   const canLog = wo.status !== "done" && wo.status !== "cancelled";
 
+  // Reassign/reschedule (E3-S9) is a planner action on a still-open job. Only
+  // then do we pay for the assignee list that the inline editor needs.
+  const canManage = can(user, "work:reassign") && canLog;
+  const assigneeOptions = canManage
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(eq(users.active, true))
+        .orderBy(asc(users.name))
+    : [];
+  // Keep a since-deactivated current assignee selectable, so editing an unrelated
+  // field (date/priority) can't silently unassign the job by falling back to the
+  // first option. Only a *new* assignment is restricted to active users.
+  const editorUsers = assigneeOptions.map((u) => ({ id: u.id, label: u.name }));
+  if (
+    canManage &&
+    wo.assigneeId != null &&
+    !editorUsers.some((u) => u.id === wo.assigneeId)
+  ) {
+    editorUsers.unshift({
+      id: wo.assigneeId,
+      label: `${wo.assigneeName ?? "Unknown"} (inactive)`,
+    });
+  }
+
   const rawPhotos = await listWorkOrderPhotos(id);
   const jobPhotos = rawPhotos.map((p) => ({
     id: p.id,
@@ -92,6 +141,50 @@ export default async function WorkOrderDetailPage({
     })}`,
     canRemove: canLog && (user.role === "admin" || p.uploadedBy === user.id),
   }));
+
+  // Checklist (E3-S5): anyone signed in ticks steps on an open job; a planner
+  // authors them. Both are frozen once the job closes.
+  const canCheck = can(user, "work:check") && canLog;
+  const canManageChecklist = can(user, "work:manage-checklist") && canLog;
+  const rawChecklist = await listChecklistItems(id);
+  const checklist = rawChecklist.map((c) => ({
+    id: c.id,
+    text: c.text,
+    checked: c.checked,
+    stamp:
+      c.checked && c.checkedAt
+        ? `${c.checkerName ?? "Unknown"} · ${formatDate(
+            c.checkedAt,
+          )}, ${c.checkedAt.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`
+        : null,
+  }));
+  const checkedCount = checklist.filter((c) => c.checked).length;
+  const uncheckedSteps = checklist.filter((c) => !c.checked).map((c) => c.text);
+  // Warn (don't block) if a job is finished with steps still unticked — floor
+  // reality wins, but name what's being skipped so it's a choice, not an oversight.
+  const doneWarning =
+    uncheckedSteps.length > 0
+      ? `${uncheckedSteps.length} step${
+          uncheckedSteps.length === 1 ? "" : "s"
+        } not ticked:\n\n${uncheckedSteps
+          .map((s) => `• ${s}`)
+          .join("\n")}\n\nMark the job done anyway?`
+      : null;
+
+  // Breakdown → downtime (E3-S8). A job resolves at most one period: if it has
+  // already closed one, show the stopped time it logged; only otherwise (and
+  // while the machine is still down) offer the prompt — so a later, unrelated
+  // breakdown can't get re-attributed to this finished job. Read from the period
+  // only, so job and machine views can never disagree (invariant #2).
+  const resolvedDowntime =
+    wo.status === "done" ? await downtimeResolvedBy(wo.id) : null;
+  const downtime =
+    wo.status === "done" && !resolvedDowntime
+      ? await openDowntimeFor(wo.machineId)
+      : null;
 
   return (
     <div className="flex flex-col gap-6 pb-4">
@@ -126,20 +219,16 @@ export default async function WorkOrderDetailPage({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[14px] text-slate-500">
-          <span>
-            Assignee:{" "}
-            <span className="text-slate-700">
-              {wo.assigneeName ?? "Unassigned"}
-            </span>
-          </span>
-          {wo.dueDate && (
-            <span>
-              Due:{" "}
-              <span className="text-slate-700">{formatDate(wo.dueDate)}</span>
-            </span>
-          )}
-        </div>
+        <PlanRow
+          workOrderId={wo.id}
+          canManage={canManage}
+          assigneeName={wo.assigneeName ?? "Unassigned"}
+          dueLabel={wo.dueDate ? formatDate(wo.dueDate) : null}
+          assigneeId={wo.assigneeId}
+          dueValue={wo.dueDate ? toDateInputValue(wo.dueDate) : ""}
+          priority={wo.priority}
+          users={editorUsers}
+        />
       </div>
 
       {wo.description && (
@@ -180,10 +269,21 @@ export default async function WorkOrderDetailPage({
               className="w-40 font-mono"
             />
           </div>
-          <button type="submit" className={buttonClass("primary", true)}>
-            <Check className="h-4 w-4" />
-            Mark done
-          </button>
+          {doneWarning ? (
+            <ConfirmSubmit
+              variant="primary"
+              full
+              icon={<Check className="h-4 w-4" />}
+              message={doneWarning}
+            >
+              Mark done
+            </ConfirmSubmit>
+          ) : (
+            <button type="submit" className={buttonClass("primary", true)}>
+              <Check className="h-4 w-4" />
+              Mark done
+            </button>
+          )}
         </form>
       )}
       {wo.status === "done" && (wo.completionNote || wo.timeSpentMinutes != null) && (
@@ -199,6 +299,51 @@ export default async function WorkOrderDetailPage({
               Time spent: <Mono className="text-slate-700">{wo.timeSpentMinutes}</Mono> min
             </p>
           )}
+        </div>
+      )}
+
+      {/* Breakdown → downtime close (E3-S8). The prompt shows while the machine
+          is still Down; once this job has ended a period, the stopped time it
+          logged shows instead (read from the period only — invariant #2). */}
+      {downtime && (
+        <DowntimePrompt
+          workOrderId={wo.id}
+          machineId={wo.machineId}
+          machineCode={wo.machineCode}
+          downLabel={`for ${downtimeSince(downtime.startedAt)}`}
+        />
+      )}
+      {resolvedDowntime && resolvedDowntime.durationMs != null && (
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[14px] text-slate-600">
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-green-700" />
+          <span>
+            Ended the machine&rsquo;s downtime —{" "}
+            <span className="text-slate-900">
+              was down {formatDuration(resolvedDowntime.durationMs)}
+            </span>
+            .
+          </span>
+        </div>
+      )}
+
+      {/* Checklist (E3-S5) — ordered steps, tick saves immediately. Shown when
+          it has steps, or when a planner can start building one on an open job. */}
+      {(checklist.length > 0 || canManageChecklist) && (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <SectionLabel>Checklist</SectionLabel>
+            {checklist.length > 0 && (
+              <Mono className="text-[13px] text-slate-500">
+                {checkedCount}/{checklist.length}
+              </Mono>
+            )}
+          </div>
+          <Checklist
+            workOrderId={wo.id}
+            items={checklist}
+            canCheck={canCheck}
+            canManage={canManageChecklist}
+          />
         </div>
       )}
 
@@ -312,15 +457,22 @@ export default async function WorkOrderDetailPage({
           {history.map((h) => (
             <div
               key={h.id}
-              className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5 text-[14px] last:border-b-0"
+              className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 text-[14px] last:border-b-0"
             >
-              <span className="text-slate-700 capitalize">
-                {h.toStatus.replace("_", " ")}
-                {h.actorName && (
-                  <span className="text-slate-500"> · {h.actorName}</span>
+              <div className="min-w-0">
+                <span className="capitalize text-slate-700">
+                  {h.toStatus.replace("_", " ")}
+                  {h.actorName && (
+                    <span className="text-slate-500"> · {h.actorName}</span>
+                  )}
+                </span>
+                {h.note && (
+                  <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-slate-500">
+                    {h.note}
+                  </p>
                 )}
-              </span>
-              <span className="text-[13px] text-slate-500">
+              </div>
+              <span className="shrink-0 text-[13px] text-slate-500 tabular-nums">
                 {formatDate(h.createdAt)}{" "}
                 {h.createdAt.toLocaleTimeString([], {
                   hour: "2-digit",

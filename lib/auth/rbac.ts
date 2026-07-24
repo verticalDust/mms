@@ -11,6 +11,7 @@ export type Action =
   | "work:start"
   | "work:complete"
   | "work:log-parts"
+  | "work:check"
   | "stock:receive"
   | "stock:issue"
   | "machine:set-status"
@@ -23,6 +24,7 @@ export type Action =
   | "pm:manage"
   | "work:create"
   | "work:reassign"
+  | "work:manage-checklist"
   | "work:cancel"
   | "work:reopen"
   | "report:triage"
@@ -35,6 +37,7 @@ const TECHNICIAN_ALLOWED = new Set<Action>([
   "work:start",
   "work:complete",
   "work:log-parts",
+  "work:check",
   "stock:receive",
   "stock:issue",
   "machine:set-status",

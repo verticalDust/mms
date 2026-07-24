@@ -41,6 +41,15 @@ export function dueState(
   return { kind: "future", date: dueDate };
 }
 
+// Local Y-M-D for an <input type="date"> value. Due dates are stored at local
+// midnight, so this round-trips them without a timezone shift.
+export function toDateInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 // Date in the factory timezone (falls back to the runtime zone if invalid).
 export function formatDate(date: Date, timezone?: string): string {
   try {

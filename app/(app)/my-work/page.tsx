@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Wrench, Clock } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
-import { searchWorkOrders } from "@/lib/queries";
+import { searchWorkOrders, uncheckedStepsFor } from "@/lib/queries";
 import { Mono, EmptyState } from "@/components/ui";
 import { startOfLocalDay, dueState } from "@/lib/format";
 import { cn } from "@/lib/cn";
@@ -15,6 +15,8 @@ export default async function MyWorkPage() {
   // Active jobs assigned to me, overdue-first (same query the queue uses).
   const { rows } = await searchWorkOrders({ assigneeId: user.id });
   const startOfToday = startOfLocalDay();
+  // Unticked steps per job, so a one-tap Done can warn before skipping them.
+  const uncheckedByJob = await uncheckedStepsFor(rows.map((r) => r.id));
 
   return (
     <div className="flex flex-col gap-5">
@@ -37,6 +39,18 @@ export default async function MyWorkPage() {
           {rows.map((wo) => {
             const ds = dueState(wo.dueDate, startOfToday);
             const overdue = ds.kind === "overdue";
+            // Only an in-progress job completes from here; warn if it still has
+            // unticked steps (warn, never block — same wording as the job page).
+            const unticked =
+              wo.status === "open" ? [] : uncheckedByJob.get(wo.id) ?? [];
+            const doneWarning =
+              unticked.length > 0
+                ? `${unticked.length} step${
+                    unticked.length === 1 ? "" : "s"
+                  } not ticked:\n\n${unticked
+                    .map((s) => `• ${s}`)
+                    .join("\n")}\n\nMark the job done anyway?`
+                : undefined;
             return (
               <div
                 key={wo.id}
@@ -88,6 +102,7 @@ export default async function MyWorkPage() {
                     label={`${
                       wo.status === "open" ? "Start" : "Complete"
                     } WO-${wo.id} — ${wo.title}`}
+                    confirmMessage={doneWarning}
                   />
                 </form>
               </div>

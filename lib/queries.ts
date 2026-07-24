@@ -21,6 +21,7 @@ import {
   reports,
   users,
   photos,
+  checklistItems,
 } from "@/lib/db/schema";
 
 export type MachineStatus = "running" | "down" | "retired";
@@ -140,6 +141,43 @@ export async function getMachineStatus(
     )
     .limit(1);
   return open ? "down" : "running";
+}
+
+// The machine's currently-open downtime period, if any (E3-S8). Drives the
+// "mark it running?" prompt on a finished breakdown job.
+export async function openDowntimeFor(
+  machineId: number,
+): Promise<{ id: number; startedAt: Date } | null> {
+  const [open] = await db
+    .select({ id: downtimePeriods.id, startedAt: downtimePeriods.startedAt })
+    .from(downtimePeriods)
+    .where(
+      and(
+        eq(downtimePeriods.machineId, machineId),
+        isNull(downtimePeriods.endedAt),
+      ),
+    )
+    .limit(1);
+  return open ?? null;
+}
+
+// The downtime period this job closed, if it closed one (period.workOrderId is
+// the link). Lets the done job show the stopped time — read from the period
+// only, so job and machine views can never disagree (invariant #2).
+export async function downtimeResolvedBy(
+  workOrderId: number,
+): Promise<{ startedAt: Date; endedAt: Date | null; durationMs: number | null } | null> {
+  const [p] = await db
+    .select({
+      startedAt: downtimePeriods.startedAt,
+      endedAt: downtimePeriods.endedAt,
+      durationMs: downtimePeriods.durationMs,
+    })
+    .from(downtimePeriods)
+    .where(eq(downtimePeriods.workOrderId, workOrderId))
+    .orderBy(desc(downtimePeriods.startedAt))
+    .limit(1);
+  return p ?? null;
 }
 
 const ACTIVE_STATUSES = ["open", "in_progress"] as const;
@@ -463,6 +501,60 @@ export async function listWorkOrderPhotos(
       ),
     )
     .orderBy(asc(photos.createdAt));
+}
+
+export type ChecklistItemRow = {
+  id: number;
+  text: string;
+  checked: boolean;
+  checkedAt: Date | null;
+  checkerName: string | null;
+};
+
+// Ordered checklist steps for a job (E3-S5), each with who ticked it and when.
+export async function listChecklistItems(
+  workOrderId: number,
+): Promise<ChecklistItemRow[]> {
+  return db
+    .select({
+      id: checklistItems.id,
+      text: checklistItems.text,
+      checked: checklistItems.checked,
+      checkedAt: checklistItems.checkedAt,
+      checkerName: users.name,
+    })
+    .from(checklistItems)
+    .leftJoin(users, eq(checklistItems.checkedBy, users.id))
+    .where(eq(checklistItems.workOrderId, workOrderId))
+    .orderBy(asc(checklistItems.position), asc(checklistItems.id));
+}
+
+// Unticked checklist step texts for a set of jobs, keyed by work order — used by
+// My Work to warn (naming them) before a one-tap Done skips over open steps.
+export async function uncheckedStepsFor(
+  workOrderIds: number[],
+): Promise<Map<number, string[]>> {
+  const map = new Map<number, string[]>();
+  if (workOrderIds.length === 0) return map;
+  const rows = await db
+    .select({
+      workOrderId: checklistItems.workOrderId,
+      text: checklistItems.text,
+    })
+    .from(checklistItems)
+    .where(
+      and(
+        inArray(checklistItems.workOrderId, workOrderIds),
+        eq(checklistItems.checked, false),
+      ),
+    )
+    .orderBy(asc(checklistItems.workOrderId), asc(checklistItems.position));
+  for (const r of rows) {
+    const list = map.get(r.workOrderId);
+    if (list) list.push(r.text);
+    else map.set(r.workOrderId, [r.text]);
+  }
+  return map;
 }
 
 // Total labour logged against a machine's completed jobs (E3-S7 time-spent).

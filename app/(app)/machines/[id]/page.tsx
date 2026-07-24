@@ -486,18 +486,28 @@ export default async function MachineDetailPage({
             {history.map((p) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-[14px] last:border-b-0"
+                className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 text-[14px] last:border-b-0"
               >
-                <div className="text-slate-700">
-                  {formatDate(p.startedAt)}{" "}
-                  <span className="text-slate-500">
-                    {p.startedAt.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+                <div className="min-w-0">
+                  <div className="text-slate-700">
+                    {formatDate(p.startedAt)}{" "}
+                    <span className="text-slate-500">
+                      {p.startedAt.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  {p.workOrderId && (
+                    <Link
+                      href={`/work-orders/${p.workOrderId}`}
+                      className="text-[13px] text-slate-500 hover:text-slate-700"
+                    >
+                      Fixed by <Mono>WO-{p.workOrderId}</Mono>
+                    </Link>
+                  )}
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   {p.endedAt ? (
                     <Mono className="text-slate-600">
                       {formatDuration(p.durationMs ?? 0)}
