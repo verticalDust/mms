@@ -26,6 +26,7 @@ import {
   openDowntimeFor,
   downtimeResolvedBy,
 } from "@/lib/queries";
+import { photosEnabled } from "@/lib/uploads";
 import {
   buttonClass,
   Mono,
@@ -437,14 +438,15 @@ export default async function WorkOrderDetailPage({
       )}
 
       {/* Photos (E3-S7) — camera/gallery, thumbnails open full-screen. Shown
-          on an open job (to add) or any job that already has photos. */}
-      {(jobPhotos.length > 0 || canLog) && (
+          on an open job (to add) or any job that already has photos. Upload is
+          hidden when photo storage isn't configured (e.g. no Blob store). */}
+      {(jobPhotos.length > 0 || (canLog && photosEnabled())) && (
         <div className="flex flex-col gap-3">
           <SectionLabel>Photos</SectionLabel>
           <JobPhotos
             workOrderId={wo.id}
             photos={jobPhotos}
-            canEdit={canLog}
+            canEdit={canLog && photosEnabled()}
             max={10}
           />
         </div>

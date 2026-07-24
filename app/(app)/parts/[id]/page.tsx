@@ -8,6 +8,7 @@ import { parts, stockMovements, users } from "@/lib/db/schema";
 import { stockLevel, listPartMachines } from "@/lib/queries";
 import { buttonClass, Mono, SectionLabel, EmptyState } from "@/components/ui";
 import { StockStatusChip, StatusChip } from "@/components/status-chip";
+import { photosEnabled } from "@/lib/uploads";
 import { StockDialog } from "../stock-dialog";
 import { PhotoUpload } from "./photo-upload";
 import { PartThumb } from "./part-thumb";
@@ -136,7 +137,7 @@ export default async function PartDetailPage({
               bin={part.binLocation}
             />
           )}
-          {isAdmin && (
+          {isAdmin && photosEnabled() && (
             <PhotoUpload partId={part.id} hasPhoto={Boolean(part.photoPath)} />
           )}
           {isAdmin && (

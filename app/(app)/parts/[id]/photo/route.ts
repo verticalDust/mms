@@ -6,7 +6,13 @@ import { db } from "@/lib/db";
 import { parts } from "@/lib/db/schema";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
-import { storePhoto, readPhoto, deletePhoto, looksLikeImage } from "@/lib/uploads";
+import {
+  storePhoto,
+  readPhoto,
+  deletePhoto,
+  looksLikeImage,
+  photosEnabled,
+} from "@/lib/uploads";
 
 // A hard server cap; the client already downscales + compresses to well under it.
 const MAX_BYTES = 3 * 1024 * 1024;
@@ -60,6 +66,11 @@ export async function POST(
       { status: 403 },
     );
   }
+  if (!photosEnabled())
+    return NextResponse.json(
+      { error: "Photo uploads aren't enabled in this deployment." },
+      { status: 503 },
+    );
   const id = Number((await params).id);
   if (!Number.isInteger(id))
     return NextResponse.json({ error: "Unknown part." }, { status: 400 });

@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { photos, workOrders } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
-import { storePhoto, looksLikeImage } from "@/lib/uploads";
+import { storePhoto, looksLikeImage, photosEnabled } from "@/lib/uploads";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB per photo (AC)
 const MAX_PER_JOB = 10;
@@ -20,6 +20,11 @@ export async function POST(
   const user = await getCurrentUser();
   if (!user)
     return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  if (!photosEnabled())
+    return NextResponse.json(
+      { error: "Photo uploads aren't enabled in this deployment." },
+      { status: 503 },
+    );
   const id = Number((await params).id);
   if (!Number.isInteger(id))
     return NextResponse.json({ error: "Unknown job." }, { status: 400 });

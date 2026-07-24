@@ -13,6 +13,14 @@ export const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 const useBlob = () => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
 const isUrl = (ref: string) => /^https?:\/\//i.test(ref);
 
+// Whether photo uploads can be stored: Blob configured, or a writable local disk
+// in dev. On a serverless deploy with no Blob store the filesystem is read-only,
+// so uploads are disabled — the UI hides its upload controls and the routes
+// refuse cleanly instead of 500-ing.
+export function photosEnabled(): boolean {
+  return useBlob() || process.env.NODE_ENV !== "production";
+}
+
 // Store JPEG bytes under a stable key (e.g. "parts/part-3.jpg", "jobs/<uuid>.jpg").
 // Returns the reference to persist in the DB: a public Blob URL on Blob, or the
 // key itself for the local store.
