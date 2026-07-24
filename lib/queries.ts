@@ -20,6 +20,7 @@ import {
   machineParts,
   reports,
   users,
+  photos,
 } from "@/lib/db/schema";
 
 export type MachineStatus = "running" | "down" | "retired";
@@ -432,6 +433,53 @@ export async function listWorkOrderParts(
     ...r,
     lineCost: r.unitCost != null ? r.unitCost * r.quantity : null,
   }));
+}
+
+// Photos attached to a job (E3-S7). The bytes stream from the per-photo route;
+// here we only need the id (for the URL) + who/when for the stamp.
+export type WorkOrderPhoto = {
+  id: number;
+  uploadedBy: number | null;
+  uploaderName: string | null;
+  createdAt: Date;
+};
+
+export async function listWorkOrderPhotos(
+  workOrderId: number,
+): Promise<WorkOrderPhoto[]> {
+  return db
+    .select({
+      id: photos.id,
+      uploadedBy: photos.uploadedBy,
+      uploaderName: users.name,
+      createdAt: photos.createdAt,
+    })
+    .from(photos)
+    .leftJoin(users, eq(photos.uploadedBy, users.id))
+    .where(
+      and(
+        eq(photos.entityType, "work_order"),
+        eq(photos.entityId, workOrderId),
+      ),
+    )
+    .orderBy(asc(photos.createdAt));
+}
+
+// Total labour logged against a machine's completed jobs (E3-S7 time-spent).
+export async function machineLaborMinutes(machineId: number): Promise<number> {
+  return scalar(
+    db
+      .select({
+        c: sql<number>`coalesce(sum(${workOrders.timeSpentMinutes}), 0)`,
+      })
+      .from(workOrders)
+      .where(
+        and(
+          eq(workOrders.machineId, machineId),
+          eq(workOrders.status, "done"),
+        ),
+      ),
+  );
 }
 
 // ── Parts (E2) ────────────────────────────────────────────────────────────────

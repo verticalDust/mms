@@ -110,7 +110,7 @@ export async function startWork(formData: FormData): Promise<void> {
   const id = Number(formData.get("workOrderId"));
 
   const [wo] = await db
-    .select({ status: workOrders.status })
+    .select({ status: workOrders.status, machineId: workOrders.machineId })
     .from(workOrders)
     .where(eq(workOrders.id, id))
     .limit(1);
@@ -123,7 +123,9 @@ export async function startWork(formData: FormData): Promise<void> {
   await logStatus(id, "open", "in_progress", user.id);
   revalidatePath(`/work-orders/${id}`);
   revalidatePath("/work-orders");
+  revalidatePath("/my-work");
   revalidatePath("/dashboard");
+  revalidatePath(`/machines/${wo.machineId}`);
 }
 
 export async function completeWork(formData: FormData): Promise<void> {
@@ -133,8 +135,14 @@ export async function completeWork(formData: FormData): Promise<void> {
   const id = Number(formData.get("workOrderId"));
   const note = String(formData.get("completionNote") ?? "").trim();
 
+  // Optional time-spent in minutes (E3-S7). Blank/garbage/≤0 stores null.
+  const minsRaw = String(formData.get("timeSpentMinutes") ?? "").trim();
+  const mins = minsRaw ? Number(minsRaw) : NaN;
+  const timeSpentMinutes =
+    Number.isInteger(mins) && mins > 0 && mins < 100_000 ? mins : null;
+
   const [wo] = await db
-    .select({ status: workOrders.status })
+    .select({ status: workOrders.status, machineId: workOrders.machineId })
     .from(workOrders)
     .where(eq(workOrders.id, id))
     .limit(1);
@@ -146,13 +154,16 @@ export async function completeWork(formData: FormData): Promise<void> {
       status: "done",
       completedAt: new Date(),
       completionNote: note || null,
+      timeSpentMinutes,
       updatedAt: new Date(),
     })
     .where(eq(workOrders.id, id));
   await logStatus(id, wo.status, "done", user.id, note || undefined);
   revalidatePath(`/work-orders/${id}`);
   revalidatePath("/work-orders");
+  revalidatePath("/my-work");
   revalidatePath("/dashboard");
+  revalidatePath(`/machines/${wo.machineId}`);
 }
 
 // ── Parts used on a job (E3-S6) ──────────────────────────────────────────────

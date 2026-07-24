@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Wrench,
   ClipboardList,
   Factory,
   Package,
@@ -16,6 +17,7 @@ type Item = { href: string; label: string; icon: LucideIcon };
 // Only routes that exist today. More light up as their epics land.
 const ITEMS: Item[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/my-work", label: "My work", icon: Wrench },
   { href: "/work-orders", label: "Work orders", icon: ClipboardList },
   { href: "/machines", label: "Machines", icon: Factory },
   { href: "/parts", label: "Parts", icon: Package },

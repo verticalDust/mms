@@ -23,7 +23,11 @@ import {
   workOrderParts,
   pmSchedules,
 } from "@/lib/db/schema";
-import { getMachineStatus, listMachineParts } from "@/lib/queries";
+import {
+  getMachineStatus,
+  listMachineParts,
+  machineLaborMinutes,
+} from "@/lib/queries";
 import { buttonClass, Mono, SectionLabel, EmptyState } from "@/components/ui";
 import {
   MachineStatusChip,
@@ -109,6 +113,7 @@ export default async function MachineDetailPage({
   const partCounts = new Map(partCountRows.map((r) => [r.woId, Number(r.c)]));
 
   const attachedParts = await listMachineParts(id);
+  const laborMinutes = await machineLaborMinutes(id);
 
   const schedules = await db
     .select()
@@ -393,7 +398,17 @@ export default async function MachineDetailPage({
 
       {/* Completed work */}
       <div className="flex flex-col gap-3">
-        <SectionLabel>Completed work</SectionLabel>
+        <div className="flex items-center justify-between gap-3">
+          <SectionLabel>Completed work</SectionLabel>
+          {laborMinutes > 0 && (
+            <span className="text-[13px] text-slate-500">
+              <Mono className="text-slate-600">
+                {formatDuration(laborMinutes * 60000)}
+              </Mono>{" "}
+              logged
+            </span>
+          )}
+        </div>
         {doneJobs.length === 0 ? (
           <EmptyState title="No completed work orders yet." />
         ) : (

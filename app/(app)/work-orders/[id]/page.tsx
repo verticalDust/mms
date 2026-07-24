@@ -10,7 +10,7 @@ import {
   users,
   workOrderStatusHistory,
 } from "@/lib/db/schema";
-import { listWorkOrderParts } from "@/lib/queries";
+import { listWorkOrderParts, listWorkOrderPhotos } from "@/lib/queries";
 import {
   buttonClass,
   Mono,
@@ -22,13 +22,14 @@ import { WorkStatusChip, PriorityChip } from "@/components/status-chip";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { formatDate } from "@/lib/format";
 import { startWork, completeWork, removePartFromJob } from "../actions";
+import { JobPhotos } from "./job-photos";
 
 export default async function WorkOrderDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -41,6 +42,7 @@ export default async function WorkOrderDetailPage({
       description: workOrders.description,
       dueDate: workOrders.dueDate,
       completionNote: workOrders.completionNote,
+      timeSpentMinutes: workOrders.timeSpentMinutes,
       machineId: machines.id,
       machineCode: machines.code,
       machineName: machines.name,
@@ -76,9 +78,20 @@ export default async function WorkOrderDetailPage({
     ? costedCents.reduce((s, c) => s + c, 0) / 100
     : null;
   const uncostedCount = jobParts.filter((p) => p.unitCost == null).length;
-  // Parts can only be logged/removed while the job is still open — a done or
-  // cancelled job's record of what was used is locked.
+  // Parts/photos can only be logged/removed while the job is still open — a done
+  // or cancelled job's record of what was used is locked.
   const canLog = wo.status !== "done" && wo.status !== "cancelled";
+
+  const rawPhotos = await listWorkOrderPhotos(id);
+  const jobPhotos = rawPhotos.map((p) => ({
+    id: p.id,
+    uploader: p.uploaderName ?? "Unknown",
+    when: `${formatDate(p.createdAt)} ${p.createdAt.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`,
+    canRemove: canLog && (user.role === "admin" || p.uploadedBy === user.id),
+  }));
 
   return (
     <div className="flex flex-col gap-6 pb-4">
@@ -155,18 +168,37 @@ export default async function WorkOrderDetailPage({
             <SectionLabel>Completion note (optional)</SectionLabel>
             <Input name="completionNote" placeholder="What did you do?" />
           </div>
+          <div className="flex flex-col gap-1.5">
+            <SectionLabel>Time spent (minutes, optional)</SectionLabel>
+            <Input
+              name="timeSpentMinutes"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              placeholder="e.g. 45"
+              className="w-40 font-mono"
+            />
+          </div>
           <button type="submit" className={buttonClass("primary", true)}>
             <Check className="h-4 w-4" />
             Mark done
           </button>
         </form>
       )}
-      {wo.status === "done" && wo.completionNote && (
+      {wo.status === "done" && (wo.completionNote || wo.timeSpentMinutes != null) && (
         <div className="flex flex-col gap-2">
-          <SectionLabel>Completion note</SectionLabel>
-          <p className="whitespace-pre-wrap text-[15px] text-slate-700">
-            {wo.completionNote}
-          </p>
+          <SectionLabel>Completion</SectionLabel>
+          {wo.completionNote && (
+            <p className="whitespace-pre-wrap text-[15px] text-slate-700">
+              {wo.completionNote}
+            </p>
+          )}
+          {wo.timeSpentMinutes != null && (
+            <p className="text-[14px] text-slate-500">
+              Time spent: <Mono className="text-slate-700">{wo.timeSpentMinutes}</Mono> min
+            </p>
+          )}
         </div>
       )}
 
@@ -256,6 +288,20 @@ export default async function WorkOrderDetailPage({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Photos (E3-S7) — camera/gallery, thumbnails open full-screen. Shown
+          on an open job (to add) or any job that already has photos. */}
+      {(jobPhotos.length > 0 || canLog) && (
+        <div className="flex flex-col gap-3">
+          <SectionLabel>Photos</SectionLabel>
+          <JobPhotos
+            workOrderId={wo.id}
+            photos={jobPhotos}
+            canEdit={canLog}
+            max={10}
+          />
         </div>
       )}
 
