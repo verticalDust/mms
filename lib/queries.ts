@@ -22,6 +22,7 @@ import {
   users,
   photos,
   checklistItems,
+  pmSchedules,
 } from "@/lib/db/schema";
 
 export type MachineStatus = "running" | "down" | "retired";
@@ -572,6 +573,103 @@ export async function machineLaborMinutes(machineId: number): Promise<number> {
         ),
       ),
   );
+}
+
+// ── Preventive maintenance (E4) ──────────────────────────────────────────────
+
+export type PmScheduleRow = {
+  id: number;
+  machineId: number;
+  title: string;
+  intervalDays: number;
+  nextDueDate: Date;
+  paused: boolean;
+  defaultAssigneeId: number | null;
+  assigneeName: string | null;
+  checklistTemplate: string | null;
+};
+
+// Schedules on one machine, soonest due first (E4-S1).
+export async function listMachinePmSchedules(
+  machineId: number,
+): Promise<PmScheduleRow[]> {
+  return db
+    .select({
+      id: pmSchedules.id,
+      machineId: pmSchedules.machineId,
+      title: pmSchedules.title,
+      intervalDays: pmSchedules.intervalDays,
+      nextDueDate: pmSchedules.nextDueDate,
+      paused: pmSchedules.paused,
+      defaultAssigneeId: pmSchedules.defaultAssigneeId,
+      assigneeName: users.name,
+      checklistTemplate: pmSchedules.checklistTemplate,
+    })
+    .from(pmSchedules)
+    .leftJoin(users, eq(pmSchedules.defaultAssigneeId, users.id))
+    .where(eq(pmSchedules.machineId, machineId))
+    .orderBy(asc(pmSchedules.nextDueDate));
+}
+
+export type PmRegisterRow = PmScheduleRow & {
+  machineCode: string;
+  machineName: string;
+};
+
+// The global PM register (E4-S5): every schedule, active ones first, then by
+// next due. Paused schedules are marked in the UI.
+export async function listPmSchedules(): Promise<PmRegisterRow[]> {
+  return db
+    .select({
+      id: pmSchedules.id,
+      machineId: pmSchedules.machineId,
+      title: pmSchedules.title,
+      intervalDays: pmSchedules.intervalDays,
+      nextDueDate: pmSchedules.nextDueDate,
+      paused: pmSchedules.paused,
+      defaultAssigneeId: pmSchedules.defaultAssigneeId,
+      assigneeName: users.name,
+      checklistTemplate: pmSchedules.checklistTemplate,
+      machineCode: machines.code,
+      machineName: machines.name,
+    })
+    .from(pmSchedules)
+    .innerJoin(machines, eq(pmSchedules.machineId, machines.id))
+    .leftJoin(users, eq(pmSchedules.defaultAssigneeId, users.id))
+    .orderBy(asc(pmSchedules.paused), asc(pmSchedules.nextDueDate));
+}
+
+// One schedule by id (for the edit form).
+export async function getPmSchedule(id: number): Promise<PmScheduleRow | null> {
+  const [row] = await listRowsForSchedule(id);
+  return row ?? null;
+}
+async function listRowsForSchedule(id: number): Promise<PmScheduleRow[]> {
+  return db
+    .select({
+      id: pmSchedules.id,
+      machineId: pmSchedules.machineId,
+      title: pmSchedules.title,
+      intervalDays: pmSchedules.intervalDays,
+      nextDueDate: pmSchedules.nextDueDate,
+      paused: pmSchedules.paused,
+      defaultAssigneeId: pmSchedules.defaultAssigneeId,
+      assigneeName: users.name,
+      checklistTemplate: pmSchedules.checklistTemplate,
+    })
+    .from(pmSchedules)
+    .leftJoin(users, eq(pmSchedules.defaultAssigneeId, users.id))
+    .where(eq(pmSchedules.id, id))
+    .limit(1);
+}
+
+// Machine ids that have at least one schedule — powers the "no PM" discovery
+// filter on the machines list (E4-S5).
+export async function machineIdsWithPm(): Promise<Set<number>> {
+  const rows = await db
+    .selectDistinct({ machineId: pmSchedules.machineId })
+    .from(pmSchedules);
+  return new Set(rows.map((r) => r.machineId));
 }
 
 // ── Parts (E2) ────────────────────────────────────────────────────────────────

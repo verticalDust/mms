@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/session";
 import {
   searchMachines,
   listMachineLocations,
+  machineIdsWithPm,
   type MachineStatusFilter,
 } from "@/lib/queries";
 import { buttonClass, Mono, EmptyState } from "@/components/ui";
@@ -35,12 +36,18 @@ export default async function MachinesPage({
     ? (sp.status as MachineStatusFilter)
     : undefined;
   const location = typeof sp.location === "string" ? sp.location : undefined;
-  const filtered = Boolean(q || status || location);
+  const noPm = sp.pm === "none";
+  const filtered = Boolean(q || status || location || noPm);
 
-  const [machines, locations] = await Promise.all([
+  const [machinesRaw, locations, pmIds] = await Promise.all([
     searchMachines({ q, status, location }),
     listMachineLocations(),
+    machineIdsWithPm(),
   ]);
+  // "No PM" discovery filter (E4-S5): machines with no schedule at all.
+  const machines = noPm
+    ? machinesRaw.filter((m) => !pmIds.has(m.id))
+    : machinesRaw;
 
   return (
     <div className="flex flex-col gap-5">
@@ -74,6 +81,10 @@ export default async function MachinesPage({
               { value: "down", label: "Down" },
               { value: "retired", label: "Retired" },
             ],
+          },
+          {
+            param: "pm",
+            options: [{ value: "none", label: "No PM" }],
           },
         ]}
         selects={

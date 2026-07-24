@@ -9,6 +9,7 @@ import {
   Package,
   Trash2,
   CheckCircle2,
+  CalendarClock,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { can } from "@/lib/auth/rbac";
@@ -67,6 +68,7 @@ export default async function WorkOrderDetailPage({
       dueDate: workOrders.dueDate,
       completionNote: workOrders.completionNote,
       timeSpentMinutes: workOrders.timeSpentMinutes,
+      source: workOrders.source,
       machineId: machines.id,
       machineCode: machines.code,
       machineName: machines.name,
@@ -201,9 +203,17 @@ export default async function WorkOrderDetailPage({
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <Mono className="text-[13px] font-medium text-slate-500">
-              WO-{wo.id}
-            </Mono>
+            <div className="flex items-center gap-2">
+              <Mono className="text-[13px] font-medium text-slate-500">
+                WO-{wo.id}
+              </Mono>
+              {wo.source === "pm" && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                  <CalendarClock className="h-3 w-3" />
+                  PM
+                </span>
+              )}
+            </div>
             <h1 className="font-condensed text-2xl font-semibold text-slate-900">
               {wo.title}
             </h1>

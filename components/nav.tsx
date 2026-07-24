@@ -7,6 +7,7 @@ import {
   Wrench,
   ClipboardList,
   Factory,
+  CalendarClock,
   Package,
   type LucideIcon,
 } from "lucide-react";
@@ -20,6 +21,7 @@ const ITEMS: Item[] = [
   { href: "/my-work", label: "My work", icon: Wrench },
   { href: "/work-orders", label: "Work orders", icon: ClipboardList },
   { href: "/machines", label: "Machines", icon: Factory },
+  { href: "/pm", label: "PM", icon: CalendarClock },
   { href: "/parts", label: "Parts", icon: Package },
 ];
 

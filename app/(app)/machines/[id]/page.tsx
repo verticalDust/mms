@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq, isNull, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, inArray, sql } from "drizzle-orm";
 import {
   ArrowLeft,
   MapPin,
@@ -12,6 +12,8 @@ import {
   Ban,
   Undo2,
   PauseCircle,
+  Play,
+  Clock,
   Trash2,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
@@ -21,12 +23,12 @@ import {
   downtimePeriods,
   workOrders,
   workOrderParts,
-  pmSchedules,
 } from "@/lib/db/schema";
 import {
   getMachineStatus,
   listMachineParts,
   machineLaborMinutes,
+  listMachinePmSchedules,
 } from "@/lib/queries";
 import { buttonClass, Mono, SectionLabel, EmptyState } from "@/components/ui";
 import {
@@ -38,7 +40,13 @@ import {
 } from "@/components/status-chip";
 import { QrImage } from "@/components/qr";
 import { ConfirmSubmit } from "@/components/confirm-submit";
-import { downtimeSince, formatDuration, formatDate } from "@/lib/format";
+import {
+  downtimeSince,
+  formatDuration,
+  formatDate,
+  startOfLocalDay,
+  dueState,
+} from "@/lib/format";
 import { qrSvg } from "@/lib/qr";
 import { appBaseUrl, machineScanPath } from "@/lib/url";
 import {
@@ -48,6 +56,8 @@ import {
   unretireMachine,
   removePart,
 } from "../actions";
+import { setPmPaused, deletePmSchedule } from "../../pm/actions";
+import { parseChecklistTemplate } from "@/lib/pm";
 
 export default async function MachineDetailPage({
   params,
@@ -115,11 +125,8 @@ export default async function MachineDetailPage({
   const attachedParts = await listMachineParts(id);
   const laborMinutes = await machineLaborMinutes(id);
 
-  const schedules = await db
-    .select()
-    .from(pmSchedules)
-    .where(eq(pmSchedules.machineId, id))
-    .orderBy(asc(pmSchedules.nextDueDate));
+  const schedules = await listMachinePmSchedules(id);
+  const startOfToday = startOfLocalDay();
 
   const history = await db
     .select()
@@ -441,37 +448,121 @@ export default async function MachineDetailPage({
         )}
       </div>
 
-      {/* Preventive maintenance */}
+      {/* Preventive maintenance (E4) */}
       <div className="flex flex-col gap-3">
-        <SectionLabel>Preventive maintenance</SectionLabel>
+        <div className="flex items-center justify-between">
+          <SectionLabel>Preventive maintenance</SectionLabel>
+          {isAdmin && !retired && (
+            <Link
+              href={`/machines/${id}/pm/new`}
+              className="inline-flex min-h-[44px] items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add schedule
+            </Link>
+          )}
+        </div>
         {schedules.length === 0 ? (
-          <EmptyState title="No preventive maintenance scheduled." />
+          <EmptyState
+            title="No preventive maintenance scheduled."
+            action={
+              isAdmin && !retired ? (
+                <Link
+                  href={`/machines/${id}/pm/new`}
+                  className={buttonClass("secondary")}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add PM schedule
+                </Link>
+              ) : undefined
+            }
+          />
         ) : (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            {schedules.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-[15px] text-slate-900">
-                    {s.title}
+            {schedules.map((s) => {
+              const steps = parseChecklistTemplate(s.checklistTemplate).length;
+              const ds = dueState(s.nextDueDate, startOfToday);
+              return (
+                <div
+                  key={s.id}
+                  className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] text-slate-900">
+                      {s.title}
+                    </div>
+                    <div className="mt-0.5 text-[13px] text-slate-500">
+                      Every {s.intervalDays} days
+                      {s.assigneeName ? ` · ${s.assigneeName}` : ""}
+                      {steps > 0 ? ` · ${steps} step${steps === 1 ? "" : "s"}` : ""}
+                    </div>
+                    <div className="mt-1 text-[13px]">
+                      {s.paused ? (
+                        <span className="inline-flex items-center gap-1 text-slate-500">
+                          <PauseCircle className="h-3.5 w-3.5" /> Paused
+                        </span>
+                      ) : ds.kind === "overdue" ? (
+                        <span className="inline-flex items-center gap-1 text-red-600">
+                          <Clock className="h-3.5 w-3.5" />
+                          <Mono>{ds.days}d</Mono> overdue
+                        </span>
+                      ) : ds.kind === "today" ? (
+                        <span className="inline-flex items-center gap-1 text-amber-700">
+                          <Clock className="h-3.5 w-3.5" /> Due today
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">
+                          Next <Mono>{formatDate(s.nextDueDate)}</Mono>
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-[13px] text-slate-500">
-                    Every {s.intervalDays} days
-                  </div>
+                  {isAdmin && !retired && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <form action={setPmPaused}>
+                        <input type="hidden" name="scheduleId" value={s.id} />
+                        <input
+                          type="hidden"
+                          name="paused"
+                          value={s.paused ? "false" : "true"}
+                        />
+                        <button
+                          type="submit"
+                          aria-label={
+                            s.paused
+                              ? `Resume ${s.title}`
+                              : `Pause ${s.title}`
+                          }
+                          className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                        >
+                          {s.paused ? (
+                            <Play className="h-4 w-4" />
+                          ) : (
+                            <PauseCircle className="h-4 w-4" />
+                          )}
+                        </button>
+                      </form>
+                      <Link
+                        href={`/machines/${id}/pm/${s.id}/edit`}
+                        aria-label={`Edit ${s.title}`}
+                        className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                      <form action={deletePmSchedule}>
+                        <input type="hidden" name="scheduleId" value={s.id} />
+                        <ConfirmSubmit
+                          compact
+                          label={`Delete ${s.title}`}
+                          icon={<Trash2 className="h-4 w-4" />}
+                          message={`Delete the "${s.title}" schedule? Jobs it already created stay as history.`}
+                        />
+                      </form>
+                    </div>
+                  )}
                 </div>
-                {s.paused ? (
-                  <StatusChip tone="slate" icon={PauseCircle}>
-                    Paused
-                  </StatusChip>
-                ) : (
-                  <span className="text-[13px] text-slate-500">
-                    Next <Mono>{formatDate(s.nextDueDate)}</Mono>
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

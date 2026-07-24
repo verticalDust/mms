@@ -23,6 +23,7 @@ import {
   insufficientMessage,
 } from "@/lib/stock";
 import { formatDate } from "@/lib/format";
+import { advanceScheduleAfterCompletion } from "@/lib/pm";
 
 // `ok` lets a client editor (the plan editor) tell success from the initial
 // blank state so it can collapse itself once the save lands.
@@ -155,23 +156,38 @@ export async function completeWork(formData: FormData): Promise<void> {
     Number.isInteger(mins) && mins > 0 && mins < 100_000 ? mins : null;
 
   const [wo] = await db
-    .select({ status: workOrders.status, machineId: workOrders.machineId })
+    .select({
+      status: workOrders.status,
+      machineId: workOrders.machineId,
+      source: workOrders.source,
+      pmScheduleId: workOrders.pmScheduleId,
+    })
     .from(workOrders)
     .where(eq(workOrders.id, id))
     .limit(1);
   if (!wo || (wo.status !== "in_progress" && wo.status !== "open")) return;
 
+  const completedAt = new Date();
   await db
     .update(workOrders)
     .set({
       status: "done",
-      completedAt: new Date(),
+      completedAt,
       completionNote: note || null,
       timeSpentMinutes,
-      updatedAt: new Date(),
+      updatedAt: completedAt,
     })
     .where(eq(workOrders.id, id));
   await logStatus(id, wo.status, "done", user.id, note || undefined);
+
+  // E4-S3: completing a PM job floats its schedule's next due to completion +
+  // interval, so a late PM doesn't trigger a pointless early repeat.
+  if (wo.source === "pm" && wo.pmScheduleId != null) {
+    await advanceScheduleAfterCompletion(wo.pmScheduleId, completedAt);
+    revalidatePath(`/machines/${wo.machineId}`);
+    revalidatePath("/pm");
+  }
+
   revalidatePath(`/work-orders/${id}`);
   revalidatePath("/work-orders");
   revalidatePath("/my-work");

@@ -6,7 +6,17 @@ import type { NextRequest } from "next/server";
 // touched here (edge runtime + native driver don't mix). Anonymous internal
 // pages: the public report surfaces under /r, and /m/{code} — the QR-label
 // target, which resolves to staff-page or public-report by auth at scan time.
-const PUBLIC_PREFIXES = ["/login", "/setup", "/forgot", "/reset", "/r/", "/m/"];
+// /api/cron/* is hit by Vercel Cron with no session cookie; it guards itself
+// with CRON_SECRET, so it must skip the login gate here (E4-S2).
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/setup",
+  "/forgot",
+  "/reset",
+  "/r/",
+  "/m/",
+  "/api/cron/",
+];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
