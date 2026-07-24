@@ -41,16 +41,23 @@ to load the schema + demo data.
 
 ## 2. Load the schema and demo data into Turso
 
-From the project root, point at the Turso DB and run the migration + seed:
+From the project root, point at the Turso DB and run the migration + seed.
+
+**If you used Vercel's Turso integration** (env vars already on the project):
+
+```bash
+vercel env pull .env.development.local   # pulls TURSO_DATABASE_URL / _AUTH_TOKEN
+node --env-file=.env.development.local scripts/migrate-turso.mjs   # creates tables
+node --env-file=.env.development.local scripts/seed-turso.mjs      # loads demo data
+```
+
+**If you created the DB with the Turso CLI** (set the values explicitly):
 
 ```bash
 # PowerShell
 $env:DATABASE_URL="libsql://mms-<org>.turso.io"
 $env:DATABASE_AUTH_TOKEN="<token>"
-npm run db:migrate                       # creates the 15 tables on Turso
-
-$env:TURSO_DATABASE_URL=$env:DATABASE_URL
-$env:TURSO_AUTH_TOKEN=$env:DATABASE_AUTH_TOKEN
+node scripts/migrate-turso.mjs           # creates the 15 tables on Turso
 node scripts/seed-turso.mjs              # copies the local demo data
 ```
 
