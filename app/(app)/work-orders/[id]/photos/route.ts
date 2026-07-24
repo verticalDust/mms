@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { writeFile } from "fs/promises";
 import { randomUUID } from "crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { photos, workOrders } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
-import { ensureJobPhotoDir, jobPhotoFile, looksLikeImage } from "@/lib/uploads";
+import { storePhoto, looksLikeImage } from "@/lib/uploads";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB per photo (AC)
 const MAX_PER_JOB = 10;
@@ -70,13 +69,11 @@ export async function POST(
       { status: 415 },
     );
 
-  const filename = `${randomUUID()}.jpg`;
-  await ensureJobPhotoDir();
-  await writeFile(jobPhotoFile(filename), buf);
+  const ref = await storePhoto(`jobs/${randomUUID()}.jpg`, buf);
   await db.insert(photos).values({
     entityType: "work_order",
     entityId: id,
-    path: filename,
+    path: ref,
     uploadedBy: user.id,
   });
 

@@ -1,28 +1,23 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { readFile, writeFile, unlink } from "fs/promises";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { parts } from "@/lib/db/schema";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
-import {
-  ensurePartsPhotoDir,
-  partPhotoFile,
-  looksLikeImage,
-} from "@/lib/uploads";
+import { storePhoto, readPhoto, deletePhoto, looksLikeImage } from "@/lib/uploads";
 
 // A hard server cap; the client already downscales + compresses to well under it.
 const MAX_BYTES = 3 * 1024 * 1024;
 
-async function partExists(id: number): Promise<boolean> {
+async function photoRef(id: number): Promise<string | null | undefined> {
   const [p] = await db
-    .select({ id: parts.id })
+    .select({ photoPath: parts.photoPath })
     .from(parts)
     .where(eq(parts.id, id))
     .limit(1);
-  return Boolean(p);
+  return p?.photoPath; // undefined = no such part; null = part with no photo
 }
 
 // GET streams the part photo (auth-gated — the /parts prefix is behind the login
@@ -35,19 +30,20 @@ export async function GET(
   const id = Number((await params).id);
   if (!Number.isInteger(id))
     return new NextResponse("Not found", { status: 404 });
-  try {
-    const buf = await readFile(partPhotoFile(id));
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        "Content-Type": "image/jpeg",
-        // Never let the browser sniff a stored upload into something executable.
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "private, max-age=60",
-      },
-    });
-  } catch {
-    return new NextResponse("Not found", { status: 404 });
-  }
+
+  const ref = await photoRef(id);
+  if (!ref) return new NextResponse("Not found", { status: 404 });
+  const buf = await readPhoto(ref);
+  if (!buf) return new NextResponse("Not found", { status: 404 });
+
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      "Content-Type": "image/jpeg",
+      // Never let the browser sniff a stored upload into something executable.
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, max-age=60",
+    },
+  });
 }
 
 export async function POST(
@@ -80,14 +76,13 @@ export async function POST(
   const buf = Buffer.from(await file.arrayBuffer());
   if (!looksLikeImage(buf))
     return NextResponse.json({ error: "That isn't a valid image." }, { status: 415 });
-  if (!(await partExists(id)))
+  if ((await photoRef(id)) === undefined)
     return NextResponse.json({ error: "Unknown part." }, { status: 404 });
 
-  await ensurePartsPhotoDir();
-  await writeFile(partPhotoFile(id), buf);
+  const ref = await storePhoto(`parts/part-${id}.jpg`, buf);
   await db
     .update(parts)
-    .set({ photoPath: `part-${id}.jpg`, updatedAt: new Date() })
+    .set({ photoPath: ref, updatedAt: new Date() })
     .where(eq(parts.id, id));
 
   revalidatePath(`/parts/${id}`);
@@ -111,14 +106,12 @@ export async function DELETE(
   const id = Number((await params).id);
   if (!Number.isInteger(id))
     return NextResponse.json({ error: "Unknown part." }, { status: 400 });
-  if (!(await partExists(id)))
+
+  const ref = await photoRef(id);
+  if (ref === undefined)
     return NextResponse.json({ error: "Unknown part." }, { status: 404 });
 
-  try {
-    await unlink(partPhotoFile(id));
-  } catch {
-    // already gone — fine
-  }
+  if (ref) await deletePhoto(ref);
   await db
     .update(parts)
     .set({ photoPath: null, updatedAt: new Date() })

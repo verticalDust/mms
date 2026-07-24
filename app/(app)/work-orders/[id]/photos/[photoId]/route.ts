@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { readFile, unlink } from "fs/promises";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { photos, workOrders } from "@/lib/db/schema";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
-import { jobPhotoFile } from "@/lib/uploads";
+import { readPhoto, deletePhoto } from "@/lib/uploads";
 
 // Resolve a photo only when it truly belongs to this work order (guards against
 // probing another job's photo id).
@@ -40,18 +39,15 @@ export async function GET(
   const ph = await findPhoto(woId, pid);
   if (!ph) return new NextResponse("Not found", { status: 404 });
 
-  try {
-    const buf = await readFile(jobPhotoFile(ph.path));
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        "Content-Type": "image/jpeg",
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "private, max-age=300",
-      },
-    });
-  } catch {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  const buf = await readPhoto(ph.path);
+  if (!buf) return new NextResponse("Not found", { status: 404 });
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      "Content-Type": "image/jpeg",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, max-age=300",
+    },
+  });
 }
 
 export async function DELETE(
@@ -88,11 +84,7 @@ export async function DELETE(
     );
 
   await db.delete(photos).where(eq(photos.id, pid));
-  try {
-    await unlink(jobPhotoFile(ph.path));
-  } catch {
-    // already gone — fine
-  }
+  await deletePhoto(ph.path);
   revalidatePath(`/work-orders/${woId}`);
   return NextResponse.json({ ok: true });
 }
