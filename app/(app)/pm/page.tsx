@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { CalendarClock, Clock, PauseCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { getSettings } from "@/lib/setup";
 import { listPmSchedules } from "@/lib/queries";
 import { Mono, SectionLabel, EmptyState } from "@/components/ui";
-import { startOfLocalDay, dueState, formatDate } from "@/lib/format";
+import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { GeneratePmButton } from "./generate-pm-button";
 
@@ -13,7 +14,9 @@ export default async function PmRegisterPage() {
   const user = await requireUser();
   const isAdmin = user.role === "admin";
   const schedules = await listPmSchedules();
-  const startOfToday = startOfLocalDay();
+  // Overdue in the factory timezone, matching the dashboard/queue (PLAN §1.5).
+  const timeZone = (await getSettings())?.timezone ?? "UTC";
+  const startOfToday = factoryStartOfDay(timeZone);
   const active = schedules.filter((s) => !s.paused);
   const overdue = active.filter(
     (s) => dueState(s.nextDueDate, startOfToday).kind === "overdue",

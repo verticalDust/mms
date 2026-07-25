@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Plus, ClipboardList, Clock, SearchX } from "lucide-react";
+import { Plus, ClipboardList, Clock, SearchX, X } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { getSettings } from "@/lib/setup";
 import {
   searchWorkOrders,
   workOrderStatusCounts,
@@ -12,7 +13,7 @@ import {
 import { buttonClass, Mono, EmptyState } from "@/components/ui";
 import { WorkStatusChip, PriorityChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
-import { startOfLocalDay, dueState } from "@/lib/format";
+import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
 import { QueueTabs, type WorkStatusFilter } from "./queue-tabs";
 
 export const metadata = { title: "Work orders · MMS" };
@@ -58,7 +59,22 @@ export default async function WorkOrdersPage({
   const machineRaw = typeof sp.machine === "string" ? sp.machine : "";
   const machineId = /^\d+$/.test(machineRaw) ? Number(machineRaw) : undefined;
 
-  const filters = { q, status, assigneeId, machineId, priority };
+  const overdue = sp.overdue === "1";
+
+  // Overdue is a factory-timezone boundary (PLAN §1.5) — the same "start of
+  // today" the dashboard gauge + buckets use, so all three agree.
+  const timeZone = (await getSettings())?.timezone ?? "UTC";
+  const startOfToday = factoryStartOfDay(timeZone);
+
+  const filters = {
+    q,
+    status,
+    assigneeId,
+    machineId,
+    priority,
+    overdue,
+    startOfToday,
+  };
 
   const [{ rows, truncated }, counts, options] = await Promise.all([
     searchWorkOrders(filters),
@@ -73,16 +89,24 @@ export default async function WorkOrdersPage({
   if (assigneeId !== undefined) baseParams.assignee = String(assigneeId);
   if (machineId !== undefined) baseParams.machine = String(machineId);
   if (priority) baseParams.priority = priority;
+  if (overdue) baseParams.overdue = "1";
 
   const activeTab: WorkStatusFilter = status ?? null;
-  const startOfToday = startOfLocalDay();
 
   // Faceted counts honour the non-status filters, so their sum tells us whether
   // the *table* is empty vs merely this scope. A truly-empty queue only exists
   // when nothing is filtered and nothing was ever created.
   const explicitFilter = Boolean(
-    q || assigneeId !== undefined || machineId !== undefined || priority,
+    q || assigneeId !== undefined || machineId !== undefined || priority || overdue,
   );
+
+  // "Clear overdue" keeps every other active filter (incl. the status tab).
+  const clearOverdue = new URLSearchParams(baseParams);
+  clearOverdue.delete("overdue");
+  if (status) clearOverdue.set("status", status);
+  const clearOverdueHref = clearOverdue.toString()
+    ? `/work-orders?${clearOverdue}`
+    : "/work-orders";
   const trulyEmpty =
     !explicitFilter && counts.active + counts.done + counts.cancelled === 0;
   const emptyTitle = explicitFilter
@@ -144,6 +168,19 @@ export default async function WorkOrdersPage({
           },
         ]}
       />
+
+      {overdue && (
+        <div>
+          <Link
+            href={clearOverdueHref}
+            className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1 font-condensed text-[13px] font-medium tracking-wide text-red-700 hover:bg-red-100"
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Overdue only
+            <X className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
 
       {rows.length === 0 ? (
         trulyEmpty ? (
@@ -208,7 +245,11 @@ export default async function WorkOrdersPage({
                       <PriorityChip priority={wo.priority} />
                       <WorkStatusChip status={wo.status} />
                     </div>
-                    <DueCell row={wo} startOfToday={startOfToday} />
+                    <DueCell
+                      row={wo}
+                      startOfToday={startOfToday}
+                      timeZone={timeZone}
+                    />
                   </div>
                 </Link>
               );
@@ -228,14 +269,16 @@ export default async function WorkOrdersPage({
 function DueCell({
   row,
   startOfToday,
+  timeZone,
 }: {
   row: QueueItem;
   startOfToday: number;
+  timeZone: string;
 }) {
   if (row.status === "done" || row.status === "cancelled") {
     return row.completedAt ? (
       <Mono className="text-[13px] text-slate-500">
-        {row.completedAt.toLocaleDateString()}
+        {formatDate(row.completedAt, timeZone)}
       </Mono>
     ) : (
       <span className="text-[13px] text-slate-400">—</span>
@@ -260,7 +303,7 @@ function DueCell({
     case "future":
       return (
         <Mono className="text-[13px] text-slate-500">
-          {ds.date.toLocaleDateString()}
+          {formatDate(ds.date, timeZone)}
         </Mono>
       );
     default:

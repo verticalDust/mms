@@ -119,6 +119,12 @@ export async function createWorkOrder(
   if (machine.retiredAt)
     return { error: "That machine is retired — you can't open work on it." };
 
+  // Due dates are day-granular. "T00:00:00" (no zone) stores SERVER-local
+  // midnight; reads bucket in the factory timezone (lib/format). These agree for
+  // any non-negative factory offset (the Bulgarian pilot on a UTC server), but a
+  // negative-offset factory would need this written at factory midnight
+  // (startOfDayEpoch) — and the same for updateWorkOrderPlan + PM's addLocalDays.
+  // Tracked for a future non-EU rollout; see PLAN §4.
   const due = parsed.data.dueDate
     ? new Date(parsed.data.dueDate + "T00:00:00")
     : null;

@@ -44,9 +44,10 @@ import {
   downtimeSince,
   formatDuration,
   formatDate,
-  startOfLocalDay,
+  factoryStartOfDay,
   dueState,
 } from "@/lib/format";
+import { getSettings } from "@/lib/setup";
 import { qrSvg } from "@/lib/qr";
 import { appBaseUrl, machineScanPath } from "@/lib/url";
 import {
@@ -126,7 +127,9 @@ export default async function MachineDetailPage({
   const laborMinutes = await machineLaborMinutes(id);
 
   const schedules = await listMachinePmSchedules(id);
-  const startOfToday = startOfLocalDay();
+  // Overdue in the factory timezone, matching the dashboard/queue (PLAN §1.5).
+  const timeZone = (await getSettings())?.timezone ?? "UTC";
+  const startOfToday = factoryStartOfDay(timeZone);
 
   const history = await db
     .select()

@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { getDashboardCounts, listWorkOrders } from "@/lib/queries";
+import { getSettings } from "@/lib/setup";
+import {
+  getDashboardCounts,
+  listWorkOrders,
+  type QueueRow,
+} from "@/lib/queries";
 import { Mono, SectionLabel, EmptyState } from "@/components/ui";
 import {
   WorkStatusChip,
@@ -8,8 +13,20 @@ import {
   ClearChip,
   StatusChip,
 } from "@/components/status-chip";
-import { OctagonX, TriangleAlert, Clock, Inbox, ClipboardList } from "lucide-react";
-import { startOfLocalDay, dueState } from "@/lib/format";
+import {
+  OctagonX,
+  TriangleAlert,
+  Clock,
+  Inbox,
+  ClipboardList,
+} from "lucide-react";
+import {
+  bucketBoundaries,
+  bucketOf,
+  dueState,
+  formatDate,
+  type WorkBucket,
+} from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export const metadata = { title: "Dashboard · MMS" };
@@ -59,18 +76,30 @@ function Gauge({
 }
 
 export default async function DashboardPage() {
-  await requireUser();
-  const counts = await getDashboardCounts();
-  const startOfToday = startOfLocalDay();
+  const user = await requireUser();
+  const timeZone = (await getSettings())?.timezone ?? "UTC";
+  // Every "today / overdue / this week" decision is made in the factory's zone,
+  // not the server's (PLAN §1.5) — the gauge count, the queue rail, and these
+  // buckets all read the same boundaries, so they can never disagree.
+  const bounds = bucketBoundaries(timeZone);
+  const counts = await getDashboardCounts(bounds.startOfToday);
 
-  // Overdue-first: earliest due (most overdue) on top, undated last — the same
-  // ordering and day-granular "overdue" the full queue uses (lib/format).
-  const queue = (await listWorkOrders(["open", "in_progress"]))
-    .sort(
-      (a, b) =>
-        (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity),
-    )
-    .slice(0, 8);
+  const openWork = await listWorkOrders(["open", "in_progress"]);
+
+  // Partition once into the four buckets; within each, soonest-due first and
+  // undated last (Overdue thus reads most-overdue → least).
+  const buckets: Record<WorkBucket, QueueRow[]> = {
+    overdue: [],
+    today: [],
+    week: [],
+    later: [],
+  };
+  for (const wo of openWork) buckets[bucketOf(wo.dueDate, bounds)].push(wo);
+  const byDue = (a: QueueRow, b: QueueRow) =>
+    (a.dueDate?.getTime() ?? Infinity) - (b.dueDate?.getTime() ?? Infinity);
+  for (const k of Object.keys(buckets) as WorkBucket[]) buckets[k].sort(byDue);
+
+  const isAdmin = user.role === "admin";
 
   return (
     <div className="flex flex-col gap-6">
@@ -80,7 +109,7 @@ export default async function DashboardPage() {
         </h1>
       </div>
 
-      {/* Five-gauge readout row — single-ink numbers, status in rail + chip */}
+      {/* Gauge readout row — each tile deep-links to its filtered list */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Gauge
           label="Open jobs"
@@ -94,7 +123,7 @@ export default async function DashboardPage() {
         <Gauge
           label="Overdue"
           value={counts.overdue}
-          href="/work-orders"
+          href="/work-orders?overdue=1"
           tone="red"
           hot={counts.overdue > 0}
           clearWord="None overdue"
@@ -107,7 +136,7 @@ export default async function DashboardPage() {
         <Gauge
           label="Machines down"
           value={counts.machinesDown}
-          href="/machines"
+          href="/machines?status=down"
           tone="red"
           hot={counts.machinesDown > 0}
           clearWord="All running"
@@ -120,7 +149,7 @@ export default async function DashboardPage() {
         <Gauge
           label="Low stock"
           value={counts.lowStock}
-          href="/parts"
+          href="/parts?low=1"
           tone="amber"
           hot={counts.lowStock > 0}
           clearWord="Stock OK"
@@ -130,80 +159,203 @@ export default async function DashboardPage() {
             </StatusChip>
           }
         />
-        <Gauge
-          label="Untriaged reports"
-          value={counts.untriaged}
-          href="/reports"
-          tone="slate"
-          hot={counts.untriaged > 0}
-          clearWord="Inbox clear"
-          hotChip={
-            <StatusChip tone="slate" icon={Inbox}>
-              To triage
-            </StatusChip>
-          }
-        />
+        {/* Triage is admin-only — a technician tapping this would bounce off
+            /reports' requireAdmin() straight back here, so don't offer it. */}
+        {isAdmin && (
+          <Gauge
+            label="Untriaged reports"
+            value={counts.untriaged}
+            href="/reports"
+            tone="slate"
+            hot={counts.untriaged > 0}
+            clearWord="Inbox clear"
+            hotChip={
+              <StatusChip tone="slate" icon={Inbox}>
+                To triage
+              </StatusChip>
+            }
+          />
+        )}
       </div>
 
-      {/* Work queue — overdue first */}
-      <div className="flex flex-col gap-3">
-        <SectionLabel>Open work · overdue first</SectionLabel>
-        {queue.length === 0 ? (
+      {/* Open work, bucketed in factory time — the standup screen (E6-S2) */}
+      <div className="flex flex-col gap-5">
+        <SectionLabel>Open work · this week</SectionLabel>
+        {openWork.length === 0 ? (
           <EmptyState
             icon={<ClipboardList className="h-6 w-6" />}
             title="No open work orders."
           />
         ) : (
-          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-            {queue.map((wo) => {
-              const ds = dueState(wo.dueDate, startOfToday);
-              return (
-                <Link
-                  key={wo.id}
-                  href={`/work-orders/${wo.id}`}
-                  className={cn(
-                    "flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50",
-                    ds.kind === "overdue" && "border-l-[3px] border-l-red-600",
-                  )}
-                >
-                  <Mono className="w-16 shrink-0 text-[13px] text-slate-500">
-                    WO-{wo.id}
-                  </Mono>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[15px] text-slate-900">
-                      {wo.title}
-                    </div>
-                    <div className="truncate text-[13px] text-slate-500">
-                      <Mono>{wo.machineCode}</Mono> · {wo.machineName}
-                    </div>
-                  </div>
-                  <PriorityChip priority={wo.priority} />
-                  <WorkStatusChip status={wo.status} />
-                  <div className="w-24 shrink-0 text-right">
-                    {ds.kind === "overdue" ? (
-                      <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
-                        <Clock className="h-3.5 w-3.5" />
-                        <Mono>{ds.days}d</Mono> over
-                      </span>
-                    ) : ds.kind === "today" ? (
-                      <span className="inline-flex items-center gap-1 text-[13px] text-amber-700">
-                        <Clock className="h-3.5 w-3.5" />
-                        Due today
-                      </span>
-                    ) : ds.kind === "future" ? (
-                      <Mono className="text-[13px] text-slate-500">
-                        {ds.date.toLocaleDateString()}
-                      </Mono>
-                    ) : (
-                      <span className="text-[13px] text-slate-400">—</span>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
+          <div className="flex flex-col gap-5">
+            <Bucket
+              bucket="overdue"
+              label="Overdue"
+              rows={buckets.overdue}
+              clearWord="None overdue"
+              timeZone={timeZone}
+              startOfToday={bounds.startOfToday}
+            />
+            <Bucket
+              bucket="today"
+              label="Today"
+              rows={buckets.today}
+              clearWord="Nothing due today"
+              timeZone={timeZone}
+              startOfToday={bounds.startOfToday}
+            />
+            <Bucket
+              bucket="week"
+              label="This week"
+              rows={buckets.week}
+              clearWord="Nothing later this week"
+              timeZone={timeZone}
+              startOfToday={bounds.startOfToday}
+            />
+            <Bucket
+              bucket="later"
+              label="Later"
+              rows={buckets.later}
+              clearWord="Nothing scheduled later"
+              timeZone={timeZone}
+              startOfToday={bounds.startOfToday}
+            />
           </div>
         )}
       </div>
     </div>
   );
+}
+
+// A due-date bucket: header (label + count, or a green-flip when empty) over the
+// job rows. Only the Overdue bucket carries the red rail + red count.
+function Bucket({
+  bucket,
+  label,
+  rows,
+  clearWord,
+  timeZone,
+  startOfToday,
+}: {
+  bucket: WorkBucket;
+  label: string;
+  rows: QueueRow[];
+  clearWord: string;
+  timeZone: string;
+  startOfToday: number;
+}) {
+  const countTone =
+    bucket === "overdue"
+      ? "bg-red-50 text-red-700"
+      : bucket === "today"
+        ? "bg-amber-50 text-amber-700"
+        : "bg-slate-100 text-slate-600";
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <SectionLabel>{label}</SectionLabel>
+        {rows.length === 0 ? (
+          <ClearChip>{clearWord}</ClearChip>
+        ) : (
+          <span
+            className={cn(
+              "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 font-mono text-[11px] font-medium tabular-nums",
+              countTone,
+            )}
+          >
+            {rows.length}
+          </span>
+        )}
+      </div>
+      {rows.length > 0 && (
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+          {rows.map((wo) => (
+            <JobRow
+              key={wo.id}
+              wo={wo}
+              overdueRail={bucket === "overdue"}
+              timeZone={timeZone}
+              startOfToday={startOfToday}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function JobRow({
+  wo,
+  overdueRail,
+  timeZone,
+  startOfToday,
+}: {
+  wo: QueueRow;
+  overdueRail: boolean;
+  timeZone: string;
+  startOfToday: number;
+}) {
+  return (
+    <Link
+      href={`/work-orders/${wo.id}`}
+      className={cn(
+        "flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50",
+        overdueRail && "border-l-[3px] border-l-red-600",
+      )}
+    >
+      <Mono className="w-16 shrink-0 text-[13px] text-slate-500">
+        WO-{wo.id}
+      </Mono>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[15px] text-slate-900">{wo.title}</div>
+        <div className="truncate text-[13px] text-slate-500">
+          <Mono>{wo.machineCode}</Mono> · {wo.machineName}
+        </div>
+      </div>
+      <div className="hidden shrink-0 sm:block">
+        <PriorityChip priority={wo.priority} />
+      </div>
+      <WorkStatusChip status={wo.status} />
+      <div className="w-24 shrink-0 text-right">
+        <DueCell
+          dueDate={wo.dueDate}
+          timeZone={timeZone}
+          startOfToday={startOfToday}
+        />
+      </div>
+    </Link>
+  );
+}
+
+function DueCell({
+  dueDate,
+  timeZone,
+  startOfToday,
+}: {
+  dueDate: Date | null;
+  timeZone: string;
+  startOfToday: number;
+}) {
+  const ds = dueState(dueDate, startOfToday);
+  if (ds.kind === "overdue")
+    return (
+      <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
+        <Clock className="h-3.5 w-3.5" />
+        <Mono>{ds.days}d</Mono> over
+      </span>
+    );
+  if (ds.kind === "today")
+    return (
+      <span className="inline-flex items-center gap-1 text-[13px] text-amber-700">
+        <Clock className="h-3.5 w-3.5" />
+        Due today
+      </span>
+    );
+  if (ds.kind === "future")
+    return (
+      <Mono className="text-[13px] text-slate-500">
+        {formatDate(ds.date, timeZone)}
+      </Mono>
+    );
+  return <span className="text-[13px] text-slate-400">No date</span>;
 }

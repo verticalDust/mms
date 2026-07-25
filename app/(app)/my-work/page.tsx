@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Wrench, Clock } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
+import { getSettings } from "@/lib/setup";
 import { searchWorkOrders, uncheckedStepsFor } from "@/lib/queries";
 import { Mono, EmptyState } from "@/components/ui";
-import { startOfLocalDay, dueState } from "@/lib/format";
+import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { startWork, completeWork } from "../work-orders/actions";
 import { JobAction } from "./job-action";
@@ -14,7 +15,9 @@ export default async function MyWorkPage() {
   const user = await requireUser();
   // Active jobs assigned to me, overdue-first (same query the queue uses).
   const { rows } = await searchWorkOrders({ assigneeId: user.id });
-  const startOfToday = startOfLocalDay();
+  // "Overdue" in the factory timezone, matching the dashboard + queue (§1.5).
+  const timeZone = (await getSettings())?.timezone ?? "UTC";
+  const startOfToday = factoryStartOfDay(timeZone);
   // Unticked steps per job, so a one-tap Done can warn before skipping them.
   const uncheckedByJob = await uncheckedStepsFor(rows.map((r) => r.id));
 
@@ -86,7 +89,7 @@ export default async function MyWorkPage() {
                     ) : ds.kind === "future" ? (
                       <span className="shrink-0">
                         <span aria-hidden>· </span>due{" "}
-                        <Mono>{ds.date.toLocaleDateString()}</Mono>
+                        <Mono>{formatDate(ds.date, timeZone)}</Mono>
                       </span>
                     ) : null}
                   </span>

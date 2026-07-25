@@ -10,7 +10,6 @@ import {
   desc,
 } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { startOfLocalDay } from "@/lib/format";
 import {
   machines,
   downtimePeriods,
@@ -198,8 +197,12 @@ async function scalar(
   return rows[0]?.c ?? 0;
 }
 
-export async function getDashboardCounts(): Promise<DashboardCounts> {
-  const now = new Date();
+// `startOfToday` is the factory-timezone start of the current day (epoch-ms) —
+// the caller computes it from settings.timezone so "overdue" here matches the
+// dashboard buckets and the queue's rail exactly (PLAN §1.5).
+export async function getDashboardCounts(
+  startOfToday: number,
+): Promise<DashboardCounts> {
   const [openJobs, overdue, machinesDown, lowStock, untriaged] =
     await Promise.all([
       scalar(
@@ -217,17 +220,23 @@ export async function getDashboardCounts(): Promise<DashboardCounts> {
               inArray(workOrders.status, [...ACTIVE_STATUSES]),
               // Day-granular: overdue is strictly before today (a job due today
               // is due, not late) — matches the queue's DueCell (lib/format).
-              sql`${workOrders.dueDate} is not null and ${workOrders.dueDate} < ${startOfLocalDay(now)}`,
+              sql`${workOrders.dueDate} is not null and ${workOrders.dueDate} < ${startOfToday}`,
             ),
           ),
       ),
       scalar(
+        // Exclude retired machines so the gauge matches the list it links to
+        // (/machines?status=down shows active machines only): a retired machine
+        // with a still-open period must not inflate the count.
         db
           .select({
             c: sql<number>`count(distinct ${downtimePeriods.machineId})`,
           })
           .from(downtimePeriods)
-          .where(isNull(downtimePeriods.endedAt)),
+          .innerJoin(machines, eq(downtimePeriods.machineId, machines.id))
+          .where(
+            and(isNull(downtimePeriods.endedAt), isNull(machines.retiredAt)),
+          ),
       ),
       scalar(
         db
@@ -278,6 +287,44 @@ export async function listWorkOrders(
     .orderBy(desc(workOrders.dueDate));
 }
 
+// Active jobs strictly past due (before the factory-TZ start of today), most
+// overdue first — the digest's overdue section (E6-S3). Same predicate as the
+// dashboard's overdue count, so email and screen never disagree.
+export async function listOverdueWorkOrders(
+  startOfToday: number,
+): Promise<QueueRow[]> {
+  return db
+    .select({
+      id: workOrders.id,
+      title: workOrders.title,
+      status: workOrders.status,
+      priority: workOrders.priority,
+      dueDate: workOrders.dueDate,
+      machineCode: machines.code,
+      machineName: machines.name,
+    })
+    .from(workOrders)
+    .innerJoin(machines, eq(workOrders.machineId, machines.id))
+    .where(
+      and(
+        inArray(workOrders.status, [...ACTIVE_STATUSES]),
+        sql`${workOrders.dueDate} is not null and ${workOrders.dueDate} < ${startOfToday}`,
+      ),
+    )
+    .orderBy(asc(workOrders.dueDate), asc(workOrders.id));
+}
+
+// Active admins — the daily digest's recipients (E6-S3). One email each.
+export async function adminRecipients(): Promise<
+  { email: string; name: string }[]
+> {
+  return db
+    .select({ email: users.email, name: users.name })
+    .from(users)
+    .where(and(eq(users.role, "admin"), eq(users.active, true)))
+    .orderBy(asc(users.name));
+}
+
 // ── Work-order queue with filters (E3-S2) ────────────────────────────────────
 
 export type WorkStatus = "open" | "in_progress" | "done" | "cancelled";
@@ -290,6 +337,10 @@ export type QueueFilters = {
   assigneeId?: number | "unassigned";
   machineId?: number;
   priority?: WorkPriority;
+  // Overdue-only view (the dashboard's Overdue gauge deep-links here). Needs a
+  // factory-TZ `startOfToday` boundary, threaded from the caller.
+  overdue?: boolean;
+  startOfToday?: number;
 };
 
 export type QueueItem = {
@@ -330,6 +381,16 @@ function queueConds(f: QueueFilters, includeStatus = true) {
   if (typeof f.machineId === "number")
     conds.push(eq(workOrders.machineId, f.machineId));
   if (f.priority) conds.push(eq(workOrders.priority, f.priority));
+  // Overdue: active jobs strictly before the factory-TZ start of today (matches
+  // the dashboard count + gauge, which are active-only). Scoping to active here —
+  // even in the facet-count path where the status filter is dropped — keeps a
+  // done/cancelled job from ever counting as "overdue" (they never are).
+  if (f.overdue && typeof f.startOfToday === "number") {
+    conds.push(inArray(workOrders.status, [...ACTIVE_STATUSES]));
+    conds.push(
+      sql`${workOrders.dueDate} is not null and ${workOrders.dueDate} < ${f.startOfToday}`,
+    );
+  }
   if (f.q && f.q.trim()) {
     const esc = f.q
       .trim()
