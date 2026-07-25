@@ -13,6 +13,7 @@ import {
   downtimePeriods,
   machines,
   users,
+  reports,
 } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
@@ -43,6 +44,9 @@ const createSchema = z.object({
   assigneeId: z.coerce.number().int().positive().optional(),
   dueDate: z.string().trim().optional(),
   description: z.string().trim().optional(),
+  // Set when triaging a report into a job (E5-S2): links the job and marks the
+  // report handled. The machine then comes from the report, not the form.
+  reportId: z.coerce.number().int().positive().optional(),
 });
 
 async function logStatus(
@@ -80,15 +84,36 @@ export async function createWorkOrder(
     assigneeId: formData.get("assigneeId") || undefined,
     dueDate: formData.get("dueDate"),
     description: formData.get("description"),
+    reportId: formData.get("reportId") || undefined,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Check the form." };
   }
 
+  // Triage path: the report must still be untriaged, and it — not the form —
+  // decides the machine, so a report can't be linked to the wrong equipment.
+  let report: { id: number; machineId: number } | null = null;
+  if (parsed.data.reportId) {
+    const [rep] = await db
+      .select({
+        id: reports.id,
+        machineId: reports.machineId,
+        status: reports.status,
+      })
+      .from(reports)
+      .where(eq(reports.id, parsed.data.reportId))
+      .limit(1);
+    if (!rep) return { error: "That report no longer exists." };
+    if (rep.status !== "new")
+      return { error: "That report has already been handled." };
+    report = { id: rep.id, machineId: rep.machineId };
+  }
+
+  const machineId = report ? report.machineId : parsed.data.machineId;
   const [machine] = await db
     .select({ retiredAt: machines.retiredAt })
     .from(machines)
-    .where(eq(machines.id, parsed.data.machineId))
+    .where(eq(machines.id, machineId))
     .limit(1);
   if (!machine) return { error: "That machine no longer exists." };
   if (machine.retiredAt)
@@ -98,23 +123,61 @@ export async function createWorkOrder(
     ? new Date(parsed.data.dueDate + "T00:00:00")
     : null;
 
-  const [row] = await db
-    .insert(workOrders)
-    .values({
-      title: parsed.data.title,
-      machineId: parsed.data.machineId,
-      priority: parsed.data.priority,
-      assigneeId: parsed.data.assigneeId ?? null,
-      dueDate: due && !isNaN(due.getTime()) ? due : null,
-      description: parsed.data.description || null,
-      createdBy: user.id,
-    })
-    .returning({ id: workOrders.id });
+  let newId: number;
+  try {
+    newId = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(workOrders)
+        .values({
+          title: parsed.data.title,
+          machineId,
+          priority: parsed.data.priority,
+          assigneeId: parsed.data.assigneeId ?? null,
+          dueDate: due && !isNaN(due.getTime()) ? due : null,
+          description: parsed.data.description || null,
+          source: report ? "report" : "manual",
+          reportId: report ? report.id : null,
+          createdBy: user.id,
+        })
+        .returning({ id: workOrders.id });
 
-  await logStatus(row.id, null, "open", user.id);
+      await tx.insert(workOrderStatusHistory).values({
+        workOrderId: row.id,
+        fromStatus: null,
+        toStatus: "open",
+        actorId: user.id,
+        note: report ? "From report" : null,
+      });
+
+      if (report) {
+        // Flip only a STILL-new report; the guard + rowsAffected check make a
+        // concurrent triage of the same report roll this whole job back rather
+        // than leave a duplicate job orphaned from the report.
+        const res = await tx
+          .update(reports)
+          .set({
+            status: "handled",
+            workOrderId: row.id,
+            handledBy: user.id,
+            handledAt: new Date(),
+          })
+          .where(and(eq(reports.id, report.id), eq(reports.status, "new")));
+        if (res.rowsAffected === 0) throw new Error("REPORT_TAKEN");
+      }
+      return row.id;
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message === "REPORT_TAKEN")
+      return { error: "That report has already been handled." };
+    if (isBusy(e)) return { error: "The queue is busy — try again." };
+    throw e;
+  }
+
   revalidatePath("/work-orders");
   revalidatePath("/dashboard");
-  redirect(`/work-orders/${row.id}`);
+  revalidatePath(`/machines/${machineId}`);
+  if (report) revalidatePath("/reports");
+  redirect(`/work-orders/${newId}`);
 }
 
 export async function startWork(formData: FormData): Promise<void> {

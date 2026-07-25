@@ -63,6 +63,48 @@ export async function deletePhoto(ref: string): Promise<void> {
   }
 }
 
+// Strip EXIF/XMP metadata from a JPEG by dropping every APP1 (0xFFE1) segment —
+// that's where a phone camera writes GPS coordinates and other identifying data.
+// The public report photo is the one upload that comes from a stranger's phone,
+// so we scrub it (PLAN §1.5). The client canvas re-encode already drops metadata;
+// this is the server-side backstop for a direct/no-JS POST. Non-JPEG bytes and
+// anything malformed pass through unchanged — worst case is an un-scrubbed byte,
+// never a corrupted image.
+export function stripJpegExif(buf: Buffer): Buffer {
+  if (buf.length < 4 || buf[0] !== 0xff || buf[1] !== 0xd8) return buf; // not JPEG
+  const out: Buffer[] = [buf.subarray(0, 2)]; // SOI
+  let i = 2;
+  while (i + 1 < buf.length) {
+    if (buf[i] !== 0xff) break; // expected a marker — bail and keep the rest
+    if (buf[i + 1] === 0xff) {
+      i++; // fill byte before a marker
+      continue;
+    }
+    const marker = buf[i + 1];
+    // Start of scan: entropy-coded data follows with no length to hop — copy the
+    // remainder verbatim and stop.
+    if (marker === 0xda) {
+      out.push(buf.subarray(i));
+      i = buf.length;
+      break;
+    }
+    // Standalone markers (EOI, RSTn, TEM) have no length payload.
+    if (marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7) || marker === 0x01) {
+      out.push(buf.subarray(i, i + 2));
+      i += 2;
+      continue;
+    }
+    if (i + 4 > buf.length) break;
+    const len = buf.readUInt16BE(i + 2); // includes the 2 length bytes
+    const segEnd = i + 2 + len;
+    if (len < 2 || segEnd > buf.length) break; // malformed — stop, keep the rest
+    if (marker !== 0xe1) out.push(buf.subarray(i, segEnd)); // omit APP1 only
+    i = segEnd;
+  }
+  if (i < buf.length) out.push(buf.subarray(i));
+  return Buffer.concat(out);
+}
+
 // Trust the bytes, not the client-declared MIME: check real image magic numbers.
 // Shared by every upload route so one definition governs what counts as an image.
 export function looksLikeImage(b: Buffer): boolean {

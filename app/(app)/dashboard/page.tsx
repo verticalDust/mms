@@ -133,7 +133,7 @@ export default async function DashboardPage() {
         <Gauge
           label="Untriaged reports"
           value={counts.untriaged}
-          href="/work-orders"
+          href="/reports"
           tone="slate"
           hot={counts.untriaged > 0}
           clearWord="Inbox clear"

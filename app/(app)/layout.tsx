@@ -1,7 +1,7 @@
 import { LogOut } from "lucide-react";
 import { requireUser } from "@/lib/auth/session";
 import { getSettings } from "@/lib/setup";
-import { countLowStock } from "@/lib/queries";
+import { countLowStock, countUntriaged } from "@/lib/queries";
 import { Sidebar, BottomTabs } from "@/components/nav";
 import { logout } from "./actions";
 
@@ -12,7 +12,10 @@ export default async function AppLayout({
 }) {
   const user = await requireUser();
   const settings = await getSettings();
-  const lowStock = await countLowStock();
+  const [lowStock, untriaged] = await Promise.all([
+    countLowStock(),
+    countUntriaged(),
+  ]);
 
   return (
     <div className="flex min-h-full flex-col md:flex-row">
@@ -29,7 +32,7 @@ export default async function AppLayout({
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          <Sidebar lowStock={lowStock} />
+          <Sidebar lowStock={lowStock} untriaged={untriaged} />
         </div>
         <div className="border-t border-slate-200 p-3">
           <div className="mb-2 px-1">
@@ -75,7 +78,7 @@ export default async function AppLayout({
         </div>
       </main>
 
-      <BottomTabs lowStock={lowStock} />
+      <BottomTabs lowStock={lowStock} untriaged={untriaged} />
     </div>
   );
 }

@@ -672,6 +672,149 @@ export async function machineIdsWithPm(): Promise<Set<number>> {
   return new Set(rows.map((r) => r.machineId));
 }
 
+// ── Reports / public triage (E5) ─────────────────────────────────────────────
+
+// Resolve a scanned QR code to its machine (E5-S1). Public path, so it returns
+// only what the physical label already shows — code, name, and whether it's live.
+export async function getMachineByCode(code: string): Promise<{
+  id: number;
+  code: string;
+  name: string;
+  retiredAt: Date | null;
+} | null> {
+  const [m] = await db
+    .select({
+      id: machines.id,
+      code: machines.code,
+      name: machines.name,
+      retiredAt: machines.retiredAt,
+    })
+    .from(machines)
+    .where(eq(machines.code, code))
+    .limit(1);
+  return m ?? null;
+}
+
+export type TriageRow = {
+  id: number;
+  machineId: number;
+  machineCode: string;
+  machineName: string;
+  machineRetired: boolean;
+  description: string;
+  reporterName: string | null;
+  hasPhoto: boolean;
+  createdAt: Date;
+};
+
+// New (untriaged) reports, oldest first — the planner works the backlog FIFO so
+// the longest-waiting fault is handled first (E5-S2). Carries whether the machine
+// was since retired, so the queue can offer "dismiss only" (a retired machine
+// refuses new work orders) instead of a dead-end Create action.
+export async function listNewReports(): Promise<TriageRow[]> {
+  const rows = await db
+    .select({
+      id: reports.id,
+      machineId: reports.machineId,
+      machineCode: machines.code,
+      machineName: machines.name,
+      machineRetiredAt: machines.retiredAt,
+      description: reports.description,
+      reporterName: reports.reporterName,
+      photoPath: reports.photoPath,
+      createdAt: reports.createdAt,
+    })
+    .from(reports)
+    .innerJoin(machines, eq(reports.machineId, machines.id))
+    .where(eq(reports.status, "new"))
+    .orderBy(asc(reports.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    machineId: r.machineId,
+    machineCode: r.machineCode,
+    machineName: r.machineName,
+    machineRetired: Boolean(r.machineRetiredAt),
+    description: r.description,
+    reporterName: r.reporterName,
+    hasPhoto: Boolean(r.photoPath),
+    createdAt: r.createdAt,
+  }));
+}
+
+export type ReportRecord = {
+  id: number;
+  machineId: number;
+  machineCode: string;
+  machineName: string;
+  machineRetiredAt: Date | null;
+  description: string;
+  reporterName: string | null;
+  photoPath: string | null;
+  status: "new" | "handled" | "dismissed";
+  workOrderId: number | null;
+  workOrderStatus: WorkStatus | null;
+  createdAt: Date;
+};
+
+// One report with its machine + linked-job status — powers the create-WO prefill
+// (E5-S2) and the operator's coarse re-scan status (E5-S3). The left join to the
+// work order (via the plain report_id → work_orders.id link) is null until the
+// report is triaged into a job.
+export async function getReport(id: number): Promise<ReportRecord | null> {
+  const [r] = await db
+    .select({
+      id: reports.id,
+      machineId: reports.machineId,
+      machineCode: machines.code,
+      machineName: machines.name,
+      machineRetiredAt: machines.retiredAt,
+      description: reports.description,
+      reporterName: reports.reporterName,
+      photoPath: reports.photoPath,
+      status: reports.status,
+      workOrderId: reports.workOrderId,
+      workOrderStatus: workOrders.status,
+      createdAt: reports.createdAt,
+    })
+    .from(reports)
+    .innerJoin(machines, eq(reports.machineId, machines.id))
+    .leftJoin(workOrders, eq(workOrders.id, reports.workOrderId))
+    .where(eq(reports.id, id))
+    .limit(1);
+  return r ?? null;
+}
+
+// Reports for one machine created since a timestamp — the per-machine burst /
+// daily-quota check for the anonymous form (PLAN §1.5). Counts EVERY row
+// (including already-triaged) so clearing the triage queue can't reopen a flood.
+export async function countReportsForMachineSince(
+  machineId: number,
+  sinceMs: number,
+): Promise<number> {
+  return scalar(
+    db
+      .select({ c: sql<number>`count(*)` })
+      .from(reports)
+      .where(
+        and(
+          eq(reports.machineId, machineId),
+          sql`${reports.createdAt} >= ${sinceMs}`,
+        ),
+      ),
+  );
+}
+
+// Untriaged (new) report count for the nav badge (E5-S2). Recomputed on every
+// navigation, so it clears itself the moment the queue empties.
+export async function countUntriaged(): Promise<number> {
+  return scalar(
+    db
+      .select({ c: sql<number>`count(*)` })
+      .from(reports)
+      .where(eq(reports.status, "new")),
+  );
+}
+
 // ── Parts (E2) ────────────────────────────────────────────────────────────────
 
 export type StockLevel = "out" | "low" | "ok";
