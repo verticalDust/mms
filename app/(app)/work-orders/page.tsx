@@ -281,7 +281,7 @@ function DueCell({
         {formatDate(row.completedAt, timeZone)}
       </Mono>
     ) : (
-      <span className="text-[13px] text-slate-400">—</span>
+      <span className="text-[13px] text-slate-500">—</span>
     );
   }
   const ds = dueState(row.dueDate, startOfToday);
@@ -307,6 +307,6 @@ function DueCell({
         </Mono>
       );
     default:
-      return <span className="text-[13px] text-slate-400">—</span>;
+      return <span className="text-[13px] text-slate-500">—</span>;
   }
 }

@@ -157,7 +157,7 @@ export function ReportForm({
           rows={5}
           maxLength={REPORT_DESC_MAX}
           placeholder={t.descPlaceholder}
-          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400"
+          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-[16px] leading-relaxed text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
       </div>
 
@@ -173,7 +173,7 @@ export function ReportForm({
           name="reporterName"
           maxLength={REPORT_NAME_MAX}
           placeholder={t.namePlaceholder}
-          className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-[16px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400"
+          className="h-12 w-full rounded-md border border-slate-200 bg-white px-3 text-[16px] text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
       </div>
 

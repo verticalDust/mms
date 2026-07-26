@@ -85,7 +85,7 @@ export function SearchFilterBar({
           value={text}
           onChange={(e) => onSearch(e.target.value)}
           placeholder={placeholder}
-          className="h-11 w-full rounded-md border border-slate-200 bg-white pl-9 pr-12 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400"
+          className="h-11 w-full rounded-md border border-slate-200 bg-white pl-9 pr-12 text-[16px] text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
         {text && (
           <button

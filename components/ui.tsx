@@ -4,12 +4,12 @@ import { cn } from "@/lib/cn";
 // Button — one safety-orange primary per screen; everything else slate.
 const buttonVariants = {
   primary:
-    "bg-orange-600 text-white hover:bg-orange-500 focus-visible:ring-orange-600",
+    "bg-primary text-white hover:bg-primary-hover focus-visible:ring-primary",
   secondary:
     "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 focus-visible:ring-slate-400",
   ghost: "bg-transparent text-slate-700 hover:bg-slate-100 focus-visible:ring-slate-400",
   danger:
-    "bg-red-600 text-white hover:bg-red-500 focus-visible:ring-red-600",
+    "bg-destructive text-white hover:bg-destructive-hover focus-visible:ring-destructive",
 } as const;
 
 export function buttonClass(
@@ -42,7 +42,7 @@ export function Button({
 }
 
 const fieldControl =
-  "h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-[15px] text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400";
+  "h-11 w-full rounded-md border border-slate-200 bg-white px-3 text-[16px] text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400";
 
 export function Input({
   className,

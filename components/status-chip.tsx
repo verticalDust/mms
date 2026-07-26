@@ -15,10 +15,14 @@ import { cn } from "@/lib/cn";
 // Status is NEVER color alone — every chip carries color + icon + word.
 type Tone = "red" | "amber" | "green" | "slate";
 
+// Status-chip surfaces route through the semantic tokens in globals.css (red =
+// destructive, amber = caution, green = good); slate is neutral chrome and stays
+// on Tailwind's scale. The tokens equal the same hues, so this is swappability,
+// not a recolor.
 const tones: Record<Tone, string> = {
-  red: "bg-red-50 text-red-700",
-  amber: "bg-amber-50 text-amber-700",
-  green: "bg-green-50 text-green-700",
+  red: "bg-destructive-tint text-destructive-ink",
+  amber: "bg-caution-tint text-caution-ink",
+  green: "bg-good-tint text-good-ink",
   slate: "bg-slate-100 text-slate-600",
 };
 

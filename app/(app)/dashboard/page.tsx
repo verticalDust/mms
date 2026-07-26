@@ -356,5 +356,5 @@ function DueCell({
         {formatDate(ds.date, timeZone)}
       </Mono>
     );
-  return <span className="text-[13px] text-slate-400">No date</span>;
+  return <span className="text-[13px] text-slate-500">No date</span>;
 }
