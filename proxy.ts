@@ -21,9 +21,13 @@ const PUBLIC_PREFIXES = [
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isPublic = PUBLIC_PREFIXES.some(
-    (p) => pathname === p.replace(/\/$/, "") || pathname.startsWith(p),
-  );
+  // Match on a path-segment boundary: a prefix is public for its exact path or
+  // anything nested under it, but NOT for a route that merely shares the string
+  // (e.g. "/login" must not make a hypothetical "/loginX" public).
+  const isPublic = PUBLIC_PREFIXES.some((p) => {
+    const base = p.replace(/\/$/, "");
+    return pathname === base || pathname.startsWith(base + "/");
+  });
   if (isPublic) return NextResponse.next();
 
   if (!req.cookies.has("mms_session")) {

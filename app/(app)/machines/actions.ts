@@ -336,6 +336,7 @@ export async function markDown(formData: FormData): Promise<void> {
 export async function markRunning(formData: FormData): Promise<void> {
   const user = await requireStatusActor();
   const machineId = Number(formData.get("machineId"));
+  if (!Number.isInteger(machineId)) return;
   if (await machineIsRetired(machineId)) return;
 
   const [open] = await db
