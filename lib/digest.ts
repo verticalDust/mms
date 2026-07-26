@@ -44,10 +44,12 @@ export async function collectDigest(startOfToday: number): Promise<DigestData> {
       machineName: w.machineName,
       title: w.title,
       // Whole days past due, measured from the factory-TZ start of today — the
-      // same formula the queue's DueCell uses (lib/format dueState).
-      daysOverdue: w.dueDate
-        ? Math.max(1, Math.round((startOfToday - w.dueDate.getTime()) / DAY))
-        : 0,
+      // same formula the queue's DueCell uses (lib/format dueState). The query
+      // only returns rows with a due date, so dueDate is always present here.
+      daysOverdue: Math.max(
+        1,
+        Math.round((startOfToday - w.dueDate!.getTime()) / DAY),
+      ),
     })),
     lowStock: lowRows.map((p) => ({
       partId: p.id,

@@ -26,6 +26,7 @@ import {
   dueState,
   formatDate,
   type WorkBucket,
+  type BucketBoundaries,
 } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -194,7 +195,7 @@ export default async function DashboardPage() {
               rows={buckets.overdue}
               clearWord="None overdue"
               timeZone={timeZone}
-              startOfToday={bounds.startOfToday}
+              bounds={bounds}
             />
             <Bucket
               bucket="today"
@@ -202,7 +203,7 @@ export default async function DashboardPage() {
               rows={buckets.today}
               clearWord="Nothing due today"
               timeZone={timeZone}
-              startOfToday={bounds.startOfToday}
+              bounds={bounds}
             />
             <Bucket
               bucket="week"
@@ -210,7 +211,7 @@ export default async function DashboardPage() {
               rows={buckets.week}
               clearWord="Nothing later this week"
               timeZone={timeZone}
-              startOfToday={bounds.startOfToday}
+              bounds={bounds}
             />
             <Bucket
               bucket="later"
@@ -218,7 +219,7 @@ export default async function DashboardPage() {
               rows={buckets.later}
               clearWord="Nothing scheduled later"
               timeZone={timeZone}
-              startOfToday={bounds.startOfToday}
+              bounds={bounds}
             />
           </div>
         )}
@@ -235,14 +236,14 @@ function Bucket({
   rows,
   clearWord,
   timeZone,
-  startOfToday,
+  bounds,
 }: {
   bucket: WorkBucket;
   label: string;
   rows: QueueRow[];
   clearWord: string;
   timeZone: string;
-  startOfToday: number;
+  bounds: BucketBoundaries;
 }) {
   const countTone =
     bucket === "overdue"
@@ -275,7 +276,7 @@ function Bucket({
               wo={wo}
               overdueRail={bucket === "overdue"}
               timeZone={timeZone}
-              startOfToday={startOfToday}
+              bounds={bounds}
             />
           ))}
         </div>
@@ -288,12 +289,12 @@ function JobRow({
   wo,
   overdueRail,
   timeZone,
-  startOfToday,
+  bounds,
 }: {
   wo: QueueRow;
   overdueRail: boolean;
   timeZone: string;
-  startOfToday: number;
+  bounds: BucketBoundaries;
 }) {
   return (
     <Link
@@ -317,11 +318,7 @@ function JobRow({
       </div>
       <WorkStatusChip status={wo.status} />
       <div className="w-24 shrink-0 text-right">
-        <DueCell
-          dueDate={wo.dueDate}
-          timeZone={timeZone}
-          startOfToday={startOfToday}
-        />
+        <DueCell dueDate={wo.dueDate} timeZone={timeZone} bounds={bounds} />
       </div>
     </Link>
   );
@@ -330,13 +327,15 @@ function JobRow({
 function DueCell({
   dueDate,
   timeZone,
-  startOfToday,
+  bounds,
 }: {
   dueDate: Date | null;
   timeZone: string;
-  startOfToday: number;
+  bounds: BucketBoundaries;
 }) {
-  const ds = dueState(dueDate, startOfToday);
+  // Pass startOfTomorrow so the "today" label agrees with bucketOf on a
+  // DST-transition day (both use the same DST-correct boundary).
+  const ds = dueState(dueDate, bounds.startOfToday, bounds.startOfTomorrow);
   if (ds.kind === "overdue")
     return (
       <span className="inline-flex items-center gap-1 text-[13px] text-red-600">

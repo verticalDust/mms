@@ -23,9 +23,14 @@ export type DueState =
 // Day-granular due classification shared by the queue AND the dashboard so
 // "overdue" means the same thing everywhere: a job due today is due, not late;
 // overdue is strictly before today, measured in whole days.
+// `startOfTomorrow` is the "today" ceiling — it defaults to a flat 24h, but a
+// caller that also buckets in a factory zone (the dashboard) passes the
+// DST-correct boundary so the row label can never disagree with bucketOf on a
+// DST-transition day.
 export function dueState(
   dueDate: Date | null,
   startOfToday: number,
+  startOfTomorrow: number = startOfToday + 86_400_000,
 ): DueState {
   if (!dueDate) return { kind: "none" };
   const due = dueDate.getTime();
@@ -36,7 +41,7 @@ export function dueState(
       kind: "overdue",
       days: Math.max(1, Math.round((startOfToday - due) / 86_400_000)),
     };
-  if (due < startOfToday + 86_400_000) return { kind: "today" };
+  if (due < startOfTomorrow) return { kind: "today" };
   return { kind: "future", date: dueDate };
 }
 
