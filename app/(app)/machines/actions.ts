@@ -240,7 +240,7 @@ export async function attachPart(
     .limit(1);
   if (!machine) return { error: "That machine no longer exists." };
   if (machine.retiredAt)
-    return { error: "That machine is retired — you can't attach parts to it." };
+    return { error: "That machine is retired. You can't attach parts to it." };
 
   const [part] = await db
     .select({ id: parts.id })

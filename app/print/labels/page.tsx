@@ -85,7 +85,7 @@ export default async function LabelsPage({
           QR labels
         </h1>
         <p className="mt-1 text-[14px] text-slate-500">
-          Preview mirrors the printed sheet. Mount one on each machine — any scan
+          Preview mirrors the printed sheet. Mount one on each machine. Any scan
           reaches the right place.
         </p>
       </div>

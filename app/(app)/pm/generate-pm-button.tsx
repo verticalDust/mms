@@ -19,7 +19,7 @@ export function GeneratePmButton() {
       {state.generated != null && (
         <span className="text-[13px] text-slate-500">
           {state.generated === 0
-            ? "Nothing due — all caught up."
+            ? "Nothing due. All caught up."
             : `Generated ${state.generated} job${state.generated === 1 ? "" : "s"}.`}
         </span>
       )}

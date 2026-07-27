@@ -35,7 +35,7 @@ export function PartForm({
       <Field
         label="SKU"
         htmlFor="sku"
-        hint={editing ? undefined : "Suggested — replace with the real part number."}
+        hint={editing ? undefined : "Suggested for you. Replace with the real part number."}
       >
         <Input
           id="sku"
@@ -102,7 +102,7 @@ export function PartForm({
         <Field
           label="Quantity on hand now"
           htmlFor="initialQty"
-          hint="Optional opening stock — recorded as the first ledger movement."
+          hint="Optional opening stock, recorded as the first ledger movement."
         >
           <Input
             id="initialQty"

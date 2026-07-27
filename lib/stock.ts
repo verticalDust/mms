@@ -37,7 +37,7 @@ export class StockError extends Error {
 // One phrasing for "not enough stock", shared by every issue path (stock issue
 // and logging parts on a job) so the same shortage always reads the same way.
 export function insufficientMessage(e: StockError): string {
-  return `Not enough in stock — ${e.onHand ?? 0} on hand${
+  return `Not enough in stock: ${e.onHand ?? 0} on hand${
     e.bin ? `, bin ${e.bin}` : ""
   }. Adjust the count if the shelf disagrees.`;
 }
@@ -82,7 +82,7 @@ export async function recordMovementTx(
   if (balanceAfter < 0) {
     throw new StockError(
       "INSUFFICIENT",
-      `Recorded stock is ${part.onHand}${part.bin ? ` — bin ${part.bin}` : ""}.`,
+      `Recorded stock is ${part.onHand}${part.bin ? `, bin ${part.bin}` : ""}.`,
       { onHand: part.onHand, bin: part.bin },
     );
   }

@@ -24,7 +24,7 @@ export function AddPartToJobForm({
       <Field
         label="Quantity used"
         htmlFor="quantity"
-        hint={`${onHand} ${unit} on hand — stock drops by what you record.`}
+        hint={`${onHand} ${unit} on hand. Stock drops by what you record.`}
       >
         <Input
           id="quantity"

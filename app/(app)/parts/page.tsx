@@ -57,7 +57,7 @@ export default async function PartsPage({
         low && !q ? (
           <EmptyState
             icon={<CircleCheck className="h-6 w-6 text-green-600" />}
-            title="Nothing to reorder — every part is at or above its minimum."
+            title="Nothing to reorder. Every part is at or above its minimum."
           />
         ) : filtered ? (
           <EmptyState

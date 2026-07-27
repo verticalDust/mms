@@ -132,7 +132,7 @@ export default async function AttachPartPage({
         q ? (
           <EmptyState
             icon={<SearchX className="h-6 w-6" />}
-            title="No matching parts — or every match is already on this machine."
+            title="No matching parts, or every match is already on this machine."
           />
         ) : (
           <EmptyState
@@ -174,7 +174,7 @@ export default async function AttachPartPage({
           </div>
           {capped && (
             <p className="text-[13px] text-slate-500">
-              Showing the first {PICK_CAP} — refine your search to narrow.
+              Showing the first {PICK_CAP}. Refine your search to narrow.
             </p>
           )}
         </>

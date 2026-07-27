@@ -73,7 +73,7 @@ export async function createPmSchedule(
     .limit(1);
   if (!machine) return { error: "That machine no longer exists." };
   if (machine.retiredAt)
-    return { error: "That machine is retired — you can't schedule PM on it." };
+    return { error: "That machine is retired. You can't schedule PM on it." };
 
   const due = new Date(parsed.data.nextDueDate + "T00:00:00");
   if (isNaN(due.getTime())) return { error: "That first due date isn't valid." };

@@ -97,7 +97,7 @@ export function PmScheduleForm({
       <Field
         label="Checklist template"
         htmlFor="checklist"
-        hint="One step per line — each generated job starts with these."
+        hint="One step per line. Each generated job starts with these."
       >
         <Textarea
           id="checklist"

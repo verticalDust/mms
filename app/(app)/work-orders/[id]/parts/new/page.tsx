@@ -213,7 +213,7 @@ export default async function AddJobPartPage({
           </div>
           {capped && (
             <p className="text-[13px] text-slate-500">
-              Showing the first {PICK_CAP} — refine your search to narrow.
+              Showing the first {PICK_CAP}. Refine your search to narrow.
             </p>
           )}
           {suggested && (

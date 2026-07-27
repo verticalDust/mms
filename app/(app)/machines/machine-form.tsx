@@ -43,8 +43,8 @@ export function MachineForm({
         htmlFor="code"
         hint={
           editing
-            ? "Changing this changes what its QR label points to — reprint if it's already mounted."
-            : "Suggested automatically — change it if you have your own scheme."
+            ? "Changing this changes what its QR label points to. Reprint if it's already mounted."
+            : "Suggested for you. Change it if you have your own scheme."
         }
       >
         <Input

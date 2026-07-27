@@ -51,7 +51,7 @@ export default async function NewPmSchedulePage({
       </div>
       {machine.retiredAt ? (
         <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
-          This machine is retired — bring it back into service before scheduling PM.
+          This machine is retired. Bring it back into service before scheduling PM.
         </p>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-6">

@@ -41,7 +41,7 @@ export async function POST(
     );
   if (wo.status === "done" || wo.status === "cancelled")
     return NextResponse.json(
-      { error: "This job is closed — photos are locked." },
+      { error: "This job is closed. Photos are locked." },
       { status: 409 },
     );
 

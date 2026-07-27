@@ -122,7 +122,7 @@ function ChecklistItemRow({
         )}
         {failed && (
           <p role="alert" className="mt-0.5 text-[12px] text-red-600">
-            Couldn&rsquo;t save — try again.
+            Couldn&rsquo;t save. Try again.
           </p>
         )}
       </div>

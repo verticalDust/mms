@@ -44,7 +44,7 @@ export function DowntimePrompt({
         </Link>
       </form>
       <p className="text-[12px] text-slate-500">
-        Leaving it Down is fine — mark it running here or on the machine page when
+        Leaving it Down is fine. Mark it running here or on the machine page when
         it&rsquo;s back.
       </p>
     </div>
@@ -64,7 +64,7 @@ function MarkRunningButton() {
       ) : (
         <Play className="h-4 w-4" />
       )}
-      Yes — mark it running
+      Yes, mark it running
     </button>
   );
 }

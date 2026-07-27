@@ -73,7 +73,7 @@ export async function DELETE(
     .limit(1);
   if (!wo || wo.status === "done" || wo.status === "cancelled")
     return NextResponse.json(
-      { error: "This job is closed — photos are locked." },
+      { error: "This job is closed. Photos are locked." },
       { status: 409 },
     );
   // Only the uploader or an admin can remove a photo.
