@@ -57,13 +57,17 @@ const source = createClient({ url: SOURCE_URL });
 const dest = createClient({ url: DEST_URL, authToken: DEST_TOKEN });
 
 async function main() {
-  // Clear the target (reverse FK order) so the seed is a clean reset.
-  for (const table of [...ORDER].reverse()) {
-    await dest.execute(`delete from ${table}`);
-  }
+  // Clear the target for a clean reset. Transient/leaf tables that reference
+  // `users` (sessions, password_resets, photos) MUST be cleared first — else
+  // `delete from users` at the tail of the loop below trips a FK constraint
+  // whenever the live demo has an active session or an uploaded photo.
   await dest.execute("delete from sessions");
   await dest.execute("delete from password_resets");
   await dest.execute("delete from photos");
+  // Then the rest, children before parents (reverse of the insert order).
+  for (const table of [...ORDER].reverse()) {
+    await dest.execute(`delete from ${table}`);
+  }
 
   let total = 0;
   for (const table of ORDER) {
