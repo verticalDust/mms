@@ -3,11 +3,14 @@
 import { useActionState, useEffect, useState } from "react";
 import { Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
+import { PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
 import { completeSetup, type FormState } from "./actions";
 
 export function SetupForm() {
   const [state, action] = useActionState<FormState, FormData>(completeSetup, {});
   const [tz, setTz] = useState("UTC");
+  const t = useT();
 
   useEffect(() => {
     try {
@@ -21,22 +24,26 @@ export function SetupForm() {
     <form action={action} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
         <div className="font-condensed text-[13px] font-medium tracking-wide text-slate-600">
-          Admin account
+          {t.setup.adminSection}
         </div>
-        <Field label="Your name" htmlFor="name">
+        <Field label={t.setup.name} htmlFor="name">
           <Input id="name" name="name" required autoComplete="name" />
         </Field>
-        <Field label="Email" htmlFor="email">
+        <Field label={t.auth.email} htmlFor="email">
           <Input
             id="email"
             name="email"
             type="email"
             required
             autoComplete="email"
-            placeholder="name@company.com"
+            placeholder={t.auth.emailPlaceholder}
           />
         </Field>
-        <Field label="Password" htmlFor="password" hint="At least 8 characters.">
+        <Field
+          label={t.auth.password}
+          htmlFor="password"
+          hint={t.setup.passwordHint(PASSWORD_MIN_LENGTH)}
+        >
           <Input
             id="password"
             name="password"
@@ -49,15 +56,15 @@ export function SetupForm() {
 
       <div className="flex flex-col gap-4 border-t border-slate-200 pt-5">
         <div className="font-condensed text-[13px] font-medium tracking-wide text-slate-600">
-          Factory
+          {t.setup.factorySection}
         </div>
-        <Field label="Factory name" htmlFor="factoryName">
+        <Field label={t.setup.factoryName} htmlFor="factoryName">
           <Input id="factoryName" name="factoryName" required />
         </Field>
         <Field
-          label="Timezone"
+          label={t.setup.timezone}
           htmlFor="timezone"
-          hint="Used for every date, bucket, and scheduled job."
+          hint={t.setup.timezoneHint}
         >
           <Input
             id="timezone"
@@ -75,7 +82,7 @@ export function SetupForm() {
         </p>
       )}
 
-      <SubmitButton>Create account and continue</SubmitButton>
+      <SubmitButton>{t.setup.submit}</SubmitButton>
     </form>
   );
 }

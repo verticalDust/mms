@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/setup";
 import { searchWorkOrders, uncheckedStepsFor } from "@/lib/queries";
 import { Mono, EmptyState } from "@/components/ui";
 import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { cn } from "@/lib/cn";
 import { startWork, completeWork } from "../work-orders/actions";
 import { JobAction } from "./job-action";
@@ -13,6 +14,7 @@ export const metadata = { title: "My work · MMS" };
 
 export default async function MyWorkPage() {
   const user = await requireUser();
+  const locale = await getLocale();
   // Active jobs assigned to me, overdue-first (same query the queue uses).
   const { rows } = await searchWorkOrders({ assigneeId: user.id });
   // "Overdue" in the factory timezone, matching the dashboard + queue (§1.5).
@@ -89,7 +91,7 @@ export default async function MyWorkPage() {
                     ) : ds.kind === "future" ? (
                       <span className="shrink-0">
                         <span aria-hidden>· </span>due{" "}
-                        <Mono>{formatDate(ds.date, timeZone)}</Mono>
+                        <Mono>{formatDate(ds.date, locale, timeZone)}</Mono>
                       </span>
                     ) : null}
                   </span>

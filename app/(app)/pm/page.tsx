@@ -5,6 +5,7 @@ import { getSettings } from "@/lib/setup";
 import { listPmSchedules } from "@/lib/queries";
 import { Mono, SectionLabel, EmptyState } from "@/components/ui";
 import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { cn } from "@/lib/cn";
 import { GeneratePmButton } from "./generate-pm-button";
 
@@ -13,6 +14,7 @@ export const metadata = { title: "Preventive maintenance · MMS" };
 export default async function PmRegisterPage() {
   const user = await requireUser();
   const isAdmin = user.role === "admin";
+  const locale = await getLocale();
   const schedules = await listPmSchedules();
   // Overdue in the factory timezone, matching the dashboard/queue (PLAN §1.5).
   const timeZone = (await getSettings())?.timezone ?? "UTC";
@@ -92,7 +94,7 @@ export default async function PmRegisterPage() {
                     </span>
                   ) : (
                     <span className="text-slate-500">
-                      Next <Mono>{formatDate(s.nextDueDate)}</Mono>
+                      Next <Mono>{formatDate(s.nextDueDate, locale)}</Mono>
                     </span>
                   )}
                 </div>

@@ -13,11 +13,21 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useT } from "@/lib/i18n/client";
 
 type BadgeKey = "lowStock" | "untriaged";
+// `key` indexes both nav (sidebar) and navShort (bottom tabs) in the catalog.
+type NavKey =
+  | "dashboard"
+  | "myWork"
+  | "workOrders"
+  | "machines"
+  | "reports"
+  | "pm"
+  | "parts";
 type Item = {
   href: string;
-  label: string;
+  key: NavKey;
   icon: LucideIcon;
   badge?: BadgeKey;
   // Triage is a planner task done at a desk — keep it off the technician's
@@ -27,13 +37,13 @@ type Item = {
 
 // Only routes that exist today. More light up as their epics land.
 const ITEMS: Item[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/my-work", label: "My work", icon: Wrench },
-  { href: "/work-orders", label: "Work orders", icon: ClipboardList },
-  { href: "/machines", label: "Machines", icon: Factory },
-  { href: "/reports", label: "Reports", icon: Inbox, badge: "untriaged", desktopOnly: true },
-  { href: "/pm", label: "PM", icon: CalendarClock },
-  { href: "/parts", label: "Parts", icon: Package, badge: "lowStock" },
+  { href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
+  { href: "/my-work", key: "myWork", icon: Wrench },
+  { href: "/work-orders", key: "workOrders", icon: ClipboardList },
+  { href: "/machines", key: "machines", icon: Factory },
+  { href: "/reports", key: "reports", icon: Inbox, badge: "untriaged", desktopOnly: true },
+  { href: "/pm", key: "pm", icon: CalendarClock },
+  { href: "/parts", key: "parts", icon: Package, badge: "lowStock" },
 ];
 
 export type NavCounts = { lowStock?: number; untriaged?: number };
@@ -58,10 +68,12 @@ const SIDEBAR_BADGE: Record<BadgeKey, string> = {
 
 export function Sidebar(counts: NavCounts = {}) {
   const pathname = usePathname();
+  const t = useT();
   return (
     <nav className="flex flex-col gap-1">
       {ITEMS.map((item) => {
-        const { href, label, icon: Icon } = item;
+        const { href, key, icon: Icon } = item;
+        const label = t.nav[key];
         const active = isActive(pathname, href);
         const badge = badgeCount(item, counts);
         return (
@@ -96,11 +108,13 @@ export function Sidebar(counts: NavCounts = {}) {
 
 export function BottomTabs(counts: NavCounts = {}) {
   const pathname = usePathname();
+  const t = useT();
   const items = ITEMS.filter((i) => !i.desktopOnly);
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-200 bg-white md:hidden">
       {items.map((item) => {
-        const { href, label, icon: Icon } = item;
+        const { href, key, icon: Icon } = item;
+        const label = t.navShort[key];
         const active = isActive(pathname, href);
         const badge = badgeCount(item, counts);
         return (

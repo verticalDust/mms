@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { getT, setLocaleCookie } from "@/lib/i18n/server";
+import { pickLocale } from "@/lib/i18n/config";
 
 export type FormState = { error?: string };
 
@@ -24,21 +26,20 @@ function throttled(key: string, now: number): boolean {
   return rec.count > MAX;
 }
 
-const NEUTRAL = "Email or password is incorrect.";
-
 export async function login(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  const t = await getT();
   const email = String(formData.get("email") ?? "")
     .trim()
     .toLowerCase();
   const password = String(formData.get("password") ?? "");
-  if (!email || !password) return { error: NEUTRAL };
+  if (!email || !password) return { error: t.auth.incorrect };
 
   const now = Date.now();
   if (throttled(email, now)) {
-    return { error: "Too many attempts. Wait a few minutes and try again." };
+    return { error: t.auth.tooManyAttempts };
   }
 
   const [user] = await db
@@ -54,9 +55,12 @@ export async function login(
       ? await verifyPassword(password, user.passwordHash)
       : false;
 
-  if (!ok || !user) return { error: NEUTRAL };
+  if (!ok || !user) return { error: t.auth.incorrect };
 
   attempts.delete(email);
   await createSession(user.id);
+  // Mirror the saved preference to the cookie so the very next render (and any
+  // future pre-auth page) already agrees with the user's language.
+  await setLocaleCookie(pickLocale(user.locale));
   redirect("/dashboard");
 }

@@ -14,6 +14,7 @@ import { buttonClass, Mono, EmptyState } from "@/components/ui";
 import { WorkStatusChip, PriorityChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
 import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { QueueTabs, type WorkStatusFilter } from "./queue-tabs";
 
 export const metadata = { title: "Work orders · MMS" };
@@ -266,7 +267,7 @@ export default async function WorkOrdersPage({
   );
 }
 
-function DueCell({
+async function DueCell({
   row,
   startOfToday,
   timeZone,
@@ -275,10 +276,11 @@ function DueCell({
   startOfToday: number;
   timeZone: string;
 }) {
+  const locale = await getLocale();
   if (row.status === "done" || row.status === "cancelled") {
     return row.completedAt ? (
       <Mono className="text-[13px] text-slate-500">
-        {formatDate(row.completedAt, timeZone)}
+        {formatDate(row.completedAt, locale, timeZone)}
       </Mono>
     ) : (
       <span className="text-[13px] text-slate-500">—</span>
@@ -303,7 +305,7 @@ function DueCell({
     case "future":
       return (
         <Mono className="text-[13px] text-slate-500">
-          {formatDate(ds.date, timeZone)}
+          {formatDate(ds.date, locale, timeZone)}
         </Mono>
       );
     default:

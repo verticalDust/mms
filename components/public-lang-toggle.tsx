@@ -7,7 +7,7 @@ import {
   OTHER_LANG,
   type Lang,
 } from "@/app/m/[code]/messages";
-import { LANG_COOKIE } from "@/lib/reports";
+import { LANG_COOKIE } from "@/lib/i18n/config";
 
 // EN/BG toggle for the STATIC public surfaces (confirmation, re-scan status,
 // dead-link). These carry no form input, so flipping the cookie and refreshing

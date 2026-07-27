@@ -28,6 +28,7 @@ import {
   type WorkBucket,
   type BucketBoundaries,
 } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { cn } from "@/lib/cn";
 
 export const metadata = { title: "Dashboard · MMS" };
@@ -324,7 +325,7 @@ function JobRow({
   );
 }
 
-function DueCell({
+async function DueCell({
   dueDate,
   timeZone,
   bounds,
@@ -333,6 +334,7 @@ function DueCell({
   timeZone: string;
   bounds: BucketBoundaries;
 }) {
+  const locale = await getLocale();
   // Pass startOfTomorrow so the "today" label agrees with bucketOf on a
   // DST-transition day (both use the same DST-correct boundary).
   const ds = dueState(dueDate, bounds.startOfToday, bounds.startOfTomorrow);
@@ -353,7 +355,7 @@ function DueCell({
   if (ds.kind === "future")
     return (
       <Mono className="text-[13px] text-slate-500">
-        {formatDate(ds.date, timeZone)}
+        {formatDate(ds.date, locale, timeZone)}
       </Mono>
     );
   return <span className="text-[13px] text-slate-500">No date</span>;

@@ -30,6 +30,11 @@ export const users = sqliteTable('users', {
     .notNull()
     .default('technician'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  // UI language preference; follows the user across devices. Defaults to
+  // Bulgarian for the pilot factory (lib/i18n).
+  locale: text('locale', { enum: ['bg', 'en'] })
+    .notNull()
+    .default('bg'),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 })

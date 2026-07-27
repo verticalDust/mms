@@ -2,7 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { CircleCheck, Factory, RotateCcw } from "lucide-react";
 import { getMachineByCode } from "@/lib/queries";
-import { LANG_COOKIE } from "@/lib/reports";
+import { LANG_COOKIE } from "@/lib/i18n/config";
 import { PublicLangToggle } from "@/components/public-lang-toggle";
 import { messages, pickLang } from "../messages";
 

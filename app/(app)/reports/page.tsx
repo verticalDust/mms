@@ -3,6 +3,7 @@ import { Clock, Inbox, ClipboardPlus, User, Ban } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { listNewReports } from "@/lib/queries";
 import { formatDuration } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { Mono, SectionLabel, EmptyState } from "@/components/ui";
 import { ClearChip } from "@/components/status-chip";
 import { buttonClass } from "@/components/ui";
@@ -16,6 +17,7 @@ export const metadata = { title: "Triage · MMS" };
 // the nav badge tracks the count and the queue green-flips when clear.
 export default async function ReportsPage() {
   await requireAdmin();
+  const locale = await getLocale();
   const reports = await listNewReports();
   const now = Date.now();
 
@@ -39,7 +41,7 @@ export default async function ReportsPage() {
       {reports.length === 0 ? (
         <EmptyState
           icon={<Inbox className="h-6 w-6" />}
-          title="No reports waiting — the floor's all quiet."
+          title="No reports waiting. The floor's all quiet."
         />
       ) : (
         <div className="flex flex-col gap-3">
@@ -62,7 +64,7 @@ export default async function ReportsPage() {
                 </Link>
                 <span className="inline-flex shrink-0 items-center gap-1 text-[13px] text-slate-500">
                   <Clock className="h-3.5 w-3.5" />
-                  <Mono>{formatDuration(now - r.createdAt.getTime())}</Mono>
+                  <Mono>{formatDuration(now - r.createdAt.getTime(), locale)}</Mono>
                 </span>
               </div>
 
@@ -100,7 +102,7 @@ export default async function ReportsPage() {
                   // only be dismissed, so don't offer a dead-end Create action.
                   <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
                     <Ban className="h-4 w-4" />
-                    Machine retired — dismiss only
+                    Machine retired · dismiss only
                   </span>
                 ) : (
                   <Link

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { useT } from "@/lib/i18n/client";
 
 // The EntityList search + filter bar (SCREENS §1). All state lives in the URL,
 // so it survives refresh and is shareable. Reused across machines / parts /
@@ -14,7 +15,7 @@ export type SelectFilter = { param: string; allLabel: string; options: Option[] 
 
 export function SearchFilterBar({
   searchParam = "q",
-  placeholder = "Search…",
+  placeholder,
   chips = [],
   selects = [],
 }: {
@@ -26,6 +27,8 @@ export function SearchFilterBar({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const t = useT();
+  const ph = placeholder ?? t.common.search;
   const [, startTransition] = useTransition();
 
   // The debounced search fires later — read the LATEST params through a ref so
@@ -81,16 +84,16 @@ export function SearchFilterBar({
         <input
           type="search"
           inputMode="search"
-          aria-label={placeholder}
+          aria-label={ph}
           value={text}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder={placeholder}
+          placeholder={ph}
           className="h-11 w-full rounded-md border border-slate-200 bg-white pl-9 pr-12 text-[16px] text-slate-900 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-400"
         />
         {text && (
           <button
             type="button"
-            aria-label="Clear search"
+            aria-label={t.common.clearSearch}
             onClick={() => onSearch("")}
             className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
           >
@@ -114,7 +117,7 @@ export function SearchFilterBar({
                   active={!active}
                   onClick={() => setParam(group.param, null)}
                 >
-                  {group.allLabel ?? "All"}
+                  {group.allLabel ?? t.common.all}
                 </Chip>
                 {group.options.map((o) => (
                   <Chip

@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/session";
 import { getSettings } from "@/lib/setup";
 import { countLowStock, countUntriaged } from "@/lib/queries";
 import { Sidebar, BottomTabs } from "@/components/nav";
+import { LangSwitcher } from "@/components/lang-switcher";
+import { getT } from "@/lib/i18n/server";
 import { logout } from "./actions";
 
 export default async function AppLayout({
@@ -11,6 +13,7 @@ export default async function AppLayout({
   children: React.ReactNode;
 }) {
   const user = await requireUser();
+  const t = await getT();
   const settings = await getSettings();
   const [lowStock, untriaged] = await Promise.all([
     countLowStock(),
@@ -39,9 +42,12 @@ export default async function AppLayout({
             <div className="truncate text-[14px] font-medium text-slate-900">
               {user.name}
             </div>
-            <div className="truncate text-[12px] text-slate-500 capitalize">
-              {user.role}
+            <div className="truncate text-[12px] text-slate-500">
+              {t.role[user.role]}
             </div>
+          </div>
+          <div className="mb-2">
+            <LangSwitcher mode="persist" />
           </div>
           <form action={logout}>
             <button
@@ -49,7 +55,7 @@ export default async function AppLayout({
               className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-[14px] text-slate-600 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
             >
               <LogOut className="h-4 w-4" />
-              Sign out
+              {t.common.signOut}
             </button>
           </form>
         </div>
@@ -60,15 +66,18 @@ export default async function AppLayout({
         <div className="font-condensed text-lg font-semibold text-slate-900">
           MMS
         </div>
-        <form action={logout}>
-          <button
-            type="submit"
-            aria-label="Sign out"
-            className="flex h-11 w-11 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50 cursor-pointer"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
-        </form>
+        <div className="flex items-center gap-1">
+          <LangSwitcher mode="persist" compact />
+          <form action={logout}>
+            <button
+              type="submit"
+              aria-label={t.common.signOut}
+              className="flex h-11 w-11 items-center justify-center rounded-md text-slate-500 hover:bg-slate-50 cursor-pointer"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+          </form>
+        </div>
       </header>
 
       {/* Content */}

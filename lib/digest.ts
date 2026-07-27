@@ -213,7 +213,8 @@ export async function sendDailyDigest(
   if (admins.length === 0) return { skipped: "no-admins" };
 
   const baseUrl = await appBaseUrl();
-  const dateStr = formatDate(now, timeZone);
+  // P1: temporary — the digest is made per-recipient-locale in P6.
+  const dateStr = formatDate(now, "en", timeZone);
   const html = renderDigestHtml(data, baseUrl, factoryName, dateStr);
   const text = renderDigestText(data, baseUrl, factoryName, dateStr);
   const subject = `${factoryName} · ${data.overdue.length} overdue, ${data.lowStock.length} low on stock`;

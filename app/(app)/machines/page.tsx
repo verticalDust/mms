@@ -11,6 +11,7 @@ import { buttonClass, Mono, EmptyState } from "@/components/ui";
 import { MachineStatusChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
 import { downtimeSince } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 
 export const metadata = { title: "Machines · MMS" };
 
@@ -29,6 +30,7 @@ export default async function MachinesPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
+  const locale = await getLocale();
   const sp = await searchParams;
 
   const q = typeof sp.q === "string" ? sp.q : "";
@@ -149,7 +151,7 @@ export default async function MachinesPage({
               {m.status === "down" && m.downSince && (
                 <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
                   <Clock className="h-3.5 w-3.5" />
-                  <Mono>{downtimeSince(m.downSince)}</Mono>
+                  <Mono>{downtimeSince(m.downSince, locale)}</Mono>
                 </span>
               )}
               <MachineStatusChip status={m.status} />

@@ -44,9 +44,11 @@ import {
   downtimeSince,
   formatDuration,
   formatDate,
+  formatTime,
   factoryStartOfDay,
   dueState,
 } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { getSettings } from "@/lib/setup";
 import { qrSvg } from "@/lib/qr";
 import { appBaseUrl, machineScanPath } from "@/lib/url";
@@ -66,6 +68,7 @@ export default async function MachineDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser();
+  const locale = await getLocale();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -154,8 +157,8 @@ export default async function MachineDetailPage({
       {retired && (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[14px] text-slate-600">
           <Ban className="h-4 w-4 shrink-0" />
-          This machine is retired — kept for its history, and it won&rsquo;t take
-          new work.
+          This machine is retired. Its history stays, and it won&rsquo;t take new
+          work.
         </div>
       )}
 
@@ -179,7 +182,7 @@ export default async function MachineDetailPage({
               <MachineStatusChip status={status} />
               {status === "down" && openPeriod && (
                 <span className="text-[13px] text-red-600">
-                  <Mono>{downtimeSince(openPeriod.startedAt)}</Mono>
+                  <Mono>{downtimeSince(openPeriod.startedAt, locale)}</Mono>
                 </span>
               )}
             </div>
@@ -358,7 +361,7 @@ export default async function MachineDetailPage({
                       compact
                       label={`Remove ${p.sku}`}
                       icon={<Trash2 className="h-4 w-4" />}
-                      message={`Remove ${p.sku} from this machine? Only the link is removed — the part and its stock history stay.`}
+                      message={`Remove ${p.sku} from this machine? This removes only the link. The part and its stock history stay.`}
                     />
                   </form>
                 )}
@@ -413,7 +416,7 @@ export default async function MachineDetailPage({
           {laborMinutes > 0 && (
             <span className="text-[13px] text-slate-500">
               <Mono className="text-slate-600">
-                {formatDuration(laborMinutes * 60000)}
+                {formatDuration(laborMinutes * 60000, locale)}
               </Mono>{" "}
               logged
             </span>
@@ -439,7 +442,7 @@ export default async function MachineDetailPage({
                       {wo.title}
                     </div>
                     <div className="truncate text-[13px] text-slate-500">
-                      {wo.completedAt ? formatDate(wo.completedAt) : "—"}
+                      {wo.completedAt ? formatDate(wo.completedAt, locale) : "—"}
                       {n > 0 && ` · ${n} part${n === 1 ? "" : "s"} used`}
                     </div>
                   </div>
@@ -515,7 +518,7 @@ export default async function MachineDetailPage({
                         </span>
                       ) : (
                         <span className="text-slate-500">
-                          Next <Mono>{formatDate(s.nextDueDate)}</Mono>
+                          Next <Mono>{formatDate(s.nextDueDate, locale)}</Mono>
                         </span>
                       )}
                     </div>
@@ -584,12 +587,9 @@ export default async function MachineDetailPage({
               >
                 <div className="min-w-0">
                   <div className="text-slate-700">
-                    {formatDate(p.startedAt)}{" "}
+                    {formatDate(p.startedAt, locale)}{" "}
                     <span className="text-slate-500">
-                      {p.startedAt.toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatTime(p.startedAt, locale)}
                     </span>
                   </div>
                   {p.workOrderId && (
@@ -604,7 +604,7 @@ export default async function MachineDetailPage({
                 <div className="shrink-0 text-right">
                   {p.endedAt ? (
                     <Mono className="text-slate-600">
-                      {formatDuration(p.durationMs ?? 0)}
+                      {formatDuration(p.durationMs ?? 0, locale)}
                     </Mono>
                   ) : (
                     <span className="text-[13px] text-red-600">ongoing</span>

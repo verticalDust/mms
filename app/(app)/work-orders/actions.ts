@@ -117,7 +117,7 @@ export async function createWorkOrder(
     .limit(1);
   if (!machine) return { error: "That machine no longer exists." };
   if (machine.retiredAt)
-    return { error: "That machine is retired — you can't open work on it." };
+    return { error: "That machine is retired. You can't open work on it." };
 
   // Due dates are day-granular. "T00:00:00" (no zone) stores SERVER-local
   // midnight; reads bucket in the factory timezone (lib/format). These agree for
@@ -175,7 +175,7 @@ export async function createWorkOrder(
   } catch (e) {
     if (e instanceof Error && e.message === "REPORT_TAKEN")
       return { error: "That report has already been handled." };
-    if (isBusy(e)) return { error: "The queue is busy — try again." };
+    if (isBusy(e)) return { error: "The queue is busy. Try again." };
     throw e;
   }
 
@@ -320,7 +320,7 @@ export async function updateWorkOrderPlan(
   if (!wo) return { error: "That work order no longer exists." };
   // A closed job's plan is locked — its assignee and dates are history now.
   if (wo.status === "done" || wo.status === "cancelled")
-    return { error: "This job is closed — its plan can't be changed." };
+    return { error: "This job is closed. Its plan can't be changed." };
 
   // Names for the audit trail (an old assignee may be inactive — still name it).
   const oldName = await userName(wo.assigneeId);
@@ -342,6 +342,10 @@ export async function updateWorkOrderPlan(
   }
 
   // Log one activity row per field that actually changed; nothing on a no-op.
+  // STORED tokens — these notes are persisted in English and translated at
+  // display time via lib/i18n/system-notes (translateSystemNote). The literal
+  // "en" and "No date" here are the frozen write-side vocabulary; do NOT swap
+  // them for t.* or a live locale.
   const events: { label: string; note: string }[] = [];
   if (wo.assigneeId !== newAssigneeId)
     events.push({ label: "reassigned", note: `${oldName} → ${newName}` });
@@ -350,8 +354,8 @@ export async function updateWorkOrderPlan(
   if (oldDueMs !== newDueMs)
     events.push({
       label: "rescheduled",
-      note: `${wo.dueDate ? formatDate(wo.dueDate) : "No date"} → ${
-        newDue ? formatDate(newDue) : "No date"
+      note: `${wo.dueDate ? formatDate(wo.dueDate, "en") : "No date"} → ${
+        newDue ? formatDate(newDue, "en") : "No date"
       }`,
     });
   if (wo.priority !== priority)
@@ -387,7 +391,7 @@ export async function updateWorkOrderPlan(
     });
   } catch (e) {
     // Rare write contention — the tx rolled back cleanly, so retry beats a 500.
-    if (isBusy(e)) return { error: "The job is busy — try again." };
+    if (isBusy(e)) return { error: "The job is busy. Try again." };
     throw e;
   }
 
@@ -450,7 +454,7 @@ export async function addChecklistItem(
     .limit(1);
   if (!wo) return { error: "That work order no longer exists." };
   if (wo.status === "done" || wo.status === "cancelled")
-    return { error: "This job is closed — its checklist is locked." };
+    return { error: "This job is closed. Its checklist is locked." };
 
   // Append after the current last step.
   const [{ maxPos }] = await db
@@ -638,7 +642,7 @@ export async function addPartToJob(
     .limit(1);
   if (!wo) return { error: "That work order no longer exists." };
   if (wo.status === "done" || wo.status === "cancelled")
-    return { error: "This job is closed — parts can only be logged on an open job." };
+    return { error: "This job is closed. Parts can only be logged on an open job." };
 
   try {
     await issuePartToWorkOrder({ workOrderId, partId, quantity, actorId: user.id });
@@ -649,7 +653,7 @@ export async function addPartToJob(
       return { error: e.message };
     }
     // Rare write contention — the tx rolled back cleanly, so retry beats a 500.
-    if (isBusy(e)) return { error: "The stock ledger is busy — try again." };
+    if (isBusy(e)) return { error: "The stock ledger is busy. Try again." };
     throw e;
   }
 

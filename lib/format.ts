@@ -1,17 +1,31 @@
+import { INTL_LOCALE, type Locale } from "./i18n/config";
+
+// Localized duration unit letters. English is tight ("3d 4h"); Bulgarian spaces
+// the abbreviation for readability ("3 д 4 ч", "45 мин").
+const DURATION_UNITS: Record<Locale, { d: string; h: string; m: string }> = {
+  en: { d: "d", h: "h", m: "m" },
+  bg: { d: " д", h: " ч", m: " мин" },
+};
+
 // Elapsed downtime as a compact instrument readout, e.g. "2h 30m", "3d 4h".
-export function downtimeSince(startedAt: Date, now: Date = new Date()): string {
-  return formatDuration(now.getTime() - startedAt.getTime());
+export function downtimeSince(
+  startedAt: Date,
+  locale: Locale,
+  now: Date = new Date(),
+): string {
+  return formatDuration(now.getTime() - startedAt.getTime(), locale);
 }
 
-export function formatDuration(ms: number): string {
+export function formatDuration(ms: number, locale: Locale): string {
   if (ms < 0) ms = 0;
   const mins = Math.floor(ms / 60000);
   const days = Math.floor(mins / 1440);
   const hours = Math.floor((mins % 1440) / 60);
   const m = mins % 60;
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${m}m`;
-  return `${m}m`;
+  const u = DURATION_UNITS[locale];
+  if (days > 0) return `${days}${u.d} ${hours}${u.h}`;
+  if (hours > 0) return `${hours}${u.h} ${m}${u.m}`;
+  return `${m}${u.m}`;
 }
 
 export type DueState =
@@ -54,17 +68,46 @@ export function toDateInputValue(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-// Date in the factory timezone (falls back to the runtime zone if invalid).
-export function formatDate(date: Date, timezone?: string): string {
+// Date in the factory timezone, in the given UI locale (falls back to the
+// runtime zone if the timezone is invalid). `locale` is required so the compiler
+// enumerates every call site — no date can silently stay English.
+export function formatDate(
+  date: Date,
+  locale: Locale,
+  timezone?: string,
+): string {
   try {
-    return new Intl.DateTimeFormat("en-GB", {
+    return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
       day: "2-digit",
       month: "short",
       year: "numeric",
       timeZone: timezone || undefined,
     }).format(date);
   } catch {
-    return date.toLocaleDateString();
+    return date.toLocaleDateString(INTL_LOCALE[locale]);
+  }
+}
+
+// Time-of-day (24h) in the given locale, optionally in a specific timezone.
+// Replaces scattered `toLocaleTimeString([], …)` calls that silently used the
+// server's runtime locale and clock convention.
+export function formatTime(
+  date: Date,
+  locale: Locale,
+  timezone?: string,
+): string {
+  try {
+    return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: timezone || undefined,
+    }).format(date);
+  } catch {
+    return date.toLocaleTimeString(INTL_LOCALE[locale], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
 }
 

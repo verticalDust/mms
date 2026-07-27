@@ -10,7 +10,8 @@ import {
   OTHER_LANG,
   type Lang,
 } from "./messages";
-import { LANG_COOKIE, REPORT_DESC_MAX, REPORT_NAME_MAX } from "@/lib/reports";
+import { REPORT_DESC_MAX, REPORT_NAME_MAX } from "@/lib/reports";
+import { LANG_COOKIE } from "@/lib/i18n/config";
 import { submitReport } from "./actions";
 
 export function ReportForm({

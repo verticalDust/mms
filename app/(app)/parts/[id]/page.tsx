@@ -12,7 +12,8 @@ import { photosEnabled } from "@/lib/uploads";
 import { StockDialog } from "../stock-dialog";
 import { PhotoUpload } from "./photo-upload";
 import { PartThumb } from "./part-thumb";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatTime } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
 import { cn } from "@/lib/cn";
 
 const MOVEMENT_LABEL: Record<string, string> = {
@@ -28,6 +29,7 @@ export default async function PartDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser();
+  const locale = await getLocale();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -195,11 +197,8 @@ export default async function PartDetailPage({
                     )}
                   </div>
                   <div className="truncate text-[12px] text-slate-500">
-                    {m.actorName ?? "—"} · {formatDate(m.createdAt)}{" "}
-                    {m.createdAt.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {m.actorName ?? "—"} · {formatDate(m.createdAt, locale)}{" "}
+                    {formatTime(m.createdAt, locale)}
                   </div>
                 </div>
                 <div className="w-24 shrink-0 text-right">

@@ -4,13 +4,15 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
 import { login, type FormState } from "./actions";
 
 export function LoginForm() {
   const [state, action] = useActionState<FormState, FormData>(login, {});
+  const t = useT();
   return (
     <form action={action} className="flex flex-col gap-4">
-      <Field label="Email" htmlFor="email">
+      <Field label={t.auth.email} htmlFor="email">
         <Input
           id="email"
           name="email"
@@ -18,10 +20,10 @@ export function LoginForm() {
           required
           autoFocus
           autoComplete="email"
-          placeholder="name@company.com"
+          placeholder={t.auth.emailPlaceholder}
         />
       </Field>
-      <Field label="Password" htmlFor="password">
+      <Field label={t.auth.password} htmlFor="password">
         <Input
           id="password"
           name="password"
@@ -35,12 +37,12 @@ export function LoginForm() {
           {state.error}
         </p>
       )}
-      <SubmitButton>Sign in</SubmitButton>
+      <SubmitButton>{t.common.signIn}</SubmitButton>
       <Link
         href="/forgot"
         className="text-center text-[13px] text-slate-500 hover:text-slate-700"
       >
-        Forgot password?
+        {t.auth.forgotPassword}
       </Link>
     </form>
   );

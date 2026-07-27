@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { randomBytes } from "crypto";
@@ -13,6 +14,7 @@ export type SessionUser = {
   name: string;
   email: string;
   role: "admin" | "technician";
+  locale: "bg" | "en";
 };
 
 export async function createSession(userId: number): Promise<void> {
@@ -38,35 +40,47 @@ export async function destroySession(): Promise<void> {
   }
 }
 
-export async function getCurrentUser(): Promise<SessionUser | null> {
-  const jar = await cookies();
-  const id = jar.get(COOKIE)?.value;
-  if (!id) return null;
+// Wrapped in React.cache() so the many callers within one request (root layout,
+// getLocale, the (app) layout's requireUser, each page) share a single DB read
+// instead of re-querying. No behavioural change — just deduplication.
+export const getCurrentUser = cache(
+  async (): Promise<SessionUser | null> => {
+    const jar = await cookies();
+    const id = jar.get(COOKIE)?.value;
+    if (!id) return null;
 
-  const rows = await db
-    .select({
-      sessionExpires: sessions.expiresAt,
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      active: users.active,
-    })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(eq(sessions.id, id))
-    .limit(1);
+    const rows = await db
+      .select({
+        sessionExpires: sessions.expiresAt,
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        active: users.active,
+        locale: users.locale,
+      })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(eq(sessions.id, id))
+      .limit(1);
 
-  const row = rows[0];
-  if (!row) return null;
-  if (row.sessionExpires.getTime() < Date.now()) {
-    await db.delete(sessions).where(eq(sessions.id, id));
-    return null;
-  }
-  if (!row.active) return null;
+    const row = rows[0];
+    if (!row) return null;
+    if (row.sessionExpires.getTime() < Date.now()) {
+      await db.delete(sessions).where(eq(sessions.id, id));
+      return null;
+    }
+    if (!row.active) return null;
 
-  return { id: row.id, name: row.name, email: row.email, role: row.role };
-}
+    return {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+      locale: row.locale,
+    };
+  },
+);
 
 export async function requireUser(): Promise<SessionUser> {
   const user = await getCurrentUser();

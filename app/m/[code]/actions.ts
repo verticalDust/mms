@@ -18,7 +18,6 @@ import {
   stripJpegExif,
 } from "@/lib/uploads";
 import {
-  LANG_COOKIE,
   recentReportCookie,
   REPORT_DESC_MAX,
   REPORT_NAME_MAX,
@@ -28,6 +27,7 @@ import {
   REPORT_DAILY_WINDOW_MS,
   REPORT_DAILY_MAX,
 } from "@/lib/reports";
+import { LANG_COOKIE } from "@/lib/i18n/config";
 import { messages, pickLang, type Lang } from "./messages";
 
 export type SubmitState = { error?: string };

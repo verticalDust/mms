@@ -39,10 +39,13 @@ import { WorkStatusChip, PriorityChip } from "@/components/status-chip";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import {
   formatDate,
+  formatTime,
   toDateInputValue,
   downtimeSince,
   formatDuration,
 } from "@/lib/format";
+import { getLocale } from "@/lib/i18n/server";
+import { INTL_LOCALE } from "@/lib/i18n/config";
 import { startWork, completeWork, removePartFromJob } from "../actions";
 import { JobPhotos } from "./job-photos";
 import { PlanRow } from "./plan-row";
@@ -55,6 +58,7 @@ export default async function WorkOrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const user = await requireUser();
+  const locale = await getLocale();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -138,10 +142,7 @@ export default async function WorkOrderDetailPage({
   const jobPhotos = rawPhotos.map((p) => ({
     id: p.id,
     uploader: p.uploaderName ?? "Unknown",
-    when: `${formatDate(p.createdAt)} ${p.createdAt.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`,
+    when: `${formatDate(p.createdAt, locale)} ${formatTime(p.createdAt, locale)}`,
     canRemove: canLog && (user.role === "admin" || p.uploadedBy === user.id),
   }));
 
@@ -158,10 +159,8 @@ export default async function WorkOrderDetailPage({
       c.checked && c.checkedAt
         ? `${c.checkerName ?? "Unknown"} · ${formatDate(
             c.checkedAt,
-          )}, ${c.checkedAt.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}`
+            locale,
+          )}, ${formatTime(c.checkedAt, locale)}`
         : null,
   }));
   const checkedCount = checklist.filter((c) => c.checked).length;
@@ -234,7 +233,7 @@ export default async function WorkOrderDetailPage({
           workOrderId={wo.id}
           canManage={canManage}
           assigneeName={wo.assigneeName ?? "Unassigned"}
-          dueLabel={wo.dueDate ? formatDate(wo.dueDate) : null}
+          dueLabel={wo.dueDate ? formatDate(wo.dueDate, locale) : null}
           assigneeId={wo.assigneeId}
           dueValue={wo.dueDate ? toDateInputValue(wo.dueDate) : ""}
           priority={wo.priority}
@@ -321,7 +320,7 @@ export default async function WorkOrderDetailPage({
           workOrderId={wo.id}
           machineId={wo.machineId}
           machineCode={wo.machineCode}
-          downLabel={`for ${downtimeSince(downtime.startedAt)}`}
+          downLabel={`for ${downtimeSince(downtime.startedAt, locale)}`}
         />
       )}
       {resolvedDowntime && resolvedDowntime.durationMs != null && (
@@ -330,7 +329,7 @@ export default async function WorkOrderDetailPage({
           <span>
             Ended the machine&rsquo;s downtime —{" "}
             <span className="text-slate-900">
-              was down {formatDuration(resolvedDowntime.durationMs)}
+              was down {formatDuration(resolvedDowntime.durationMs, locale)}
             </span>
             .
           </span>
@@ -438,7 +437,10 @@ export default async function WorkOrderDetailPage({
                     )}
                   </span>
                   <Mono className="font-medium text-slate-900">
-                    {totalCost.toFixed(2)}
+                    {new Intl.NumberFormat(INTL_LOCALE[locale], {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    }).format(totalCost)}
                   </Mono>
                 </div>
               )}
@@ -485,11 +487,7 @@ export default async function WorkOrderDetailPage({
                 )}
               </div>
               <span className="shrink-0 text-[13px] text-slate-500 tabular-nums">
-                {formatDate(h.createdAt)}{" "}
-                {h.createdAt.toLocaleTimeString([], {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
+                {formatDate(h.createdAt, locale)} {formatTime(h.createdAt, locale)}
               </span>
             </div>
           ))}

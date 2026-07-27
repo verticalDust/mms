@@ -4,7 +4,7 @@
    goes to bright-factory-light legibility, not a dark theme. */
 @theme {
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-condensed: var(--font-plex-condensed), var(--font-plex-sans),
+  --font-condensed: var(--font-condensed-face), var(--font-plex-sans),
     sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 

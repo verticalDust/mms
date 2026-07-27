@@ -16,9 +16,9 @@ import { photosEnabled } from "@/lib/uploads";
 import {
   coarseStatus,
   recentReportCookie,
-  LANG_COOKIE,
   type CoarseStatus,
 } from "@/lib/reports";
+import { LANG_COOKIE } from "@/lib/i18n/config";
 import { Mono } from "@/components/ui";
 import { PublicLangToggle } from "@/components/public-lang-toggle";
 import { messages, pickLang, type Lang } from "./messages";

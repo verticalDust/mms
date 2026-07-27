@@ -16,10 +16,9 @@ export const REPORT_BURST_MAX = 10;
 export const REPORT_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const REPORT_DAILY_MAX = 40; // ≤40 per machine per 24h
 
-// Per-device pointers (no login). The recent-report cookie drives the re-scan
-// status view (E5-S3); the language cookie carries the operator's EN/BG choice
-// across the public surfaces so a re-scan or the confirmation stays in-language.
-export const LANG_COOKIE = "mms_lang";
+// Per-device pointer (no login): the recent-report cookie drives the re-scan
+// status view (E5-S3). The language cookie now lives in lib/i18n/config
+// (LANG_COOKIE) because it's shared with the whole app, not just this surface.
 export const recentReportCookie = (machineId: number) => `mms_rep_${machineId}`;
 
 export type CoarseStatus = "received" | "working" | "fixed" | "reviewed";

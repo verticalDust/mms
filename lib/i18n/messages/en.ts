@@ -1,0 +1,206 @@
+// English mirror of bg.ts. `satisfies Messages` makes the compiler reject any
+// missing/extra key or a function whose signature drifts from the Bulgarian
+// source — so the two files can never fall out of sync silently.
+import type { Messages } from "./bg";
+
+export const en = {
+  common: {
+    save: "Save",
+    saveChanges: "Save changes",
+    cancel: "Cancel",
+    edit: "Edit",
+    remove: "Remove",
+    back: "Back",
+    search: "Search…",
+    clearFilters: "Clear filters",
+    add: "Add",
+    all: "All",
+    clearSearch: "Clear search",
+    close: "Close",
+    optional: "Optional",
+    signIn: "Sign in",
+    signOut: "Sign out",
+    switchLanguage: "Switch language",
+  },
+
+  nav: {
+    dashboard: "Dashboard",
+    myWork: "My work",
+    workOrders: "Work orders",
+    machines: "Machines",
+    reports: "Reports",
+    pm: "PM",
+    parts: "Parts",
+  },
+
+  navShort: {
+    dashboard: "Dashboard",
+    myWork: "My work",
+    workOrders: "Work orders",
+    machines: "Machines",
+    reports: "Reports",
+    pm: "PM",
+    parts: "Parts",
+  },
+
+  meta: {
+    description: "Maintenance Management System",
+    dashboard: "Dashboard · MMS",
+    myWork: "My work · MMS",
+    workOrders: "Work orders · MMS",
+    newWorkOrder: "New work order · MMS",
+    machines: "Machines · MMS",
+    addMachine: "Add machine · MMS",
+    editMachine: "Edit machine · MMS",
+    newPmSchedule: "New PM schedule · MMS",
+    editPmSchedule: "Edit PM schedule · MMS",
+    addPartToMachine: "Add part to machine · MMS",
+    parts: "Parts · MMS",
+    addPart: "Add part · MMS",
+    editPart: "Edit part · MMS",
+    addPartToJob: "Add part to job · MMS",
+    pm: "Preventive maintenance · MMS",
+    reports: "Triage · MMS",
+    qrLabels: "QR labels · MMS",
+    signIn: "Sign in · MMS",
+    resetPassword: "Reset password · MMS",
+    setup: "Set up MMS",
+    reportFault: "Report a fault · MMS",
+    reported: "Reported · MMS",
+  },
+
+  role: {
+    admin: "Admin",
+    technician: "Technician",
+  },
+
+  status: {
+    work: {
+      open: "Open",
+      in_progress: "In progress",
+      done: "Done",
+      cancelled: "Cancelled",
+    },
+    machine: {
+      running: "Running",
+      down: "Down",
+      retired: "Retired",
+    },
+    stock: {
+      out: "Out",
+      low: "Low",
+      ok: "OK",
+    },
+  },
+
+  priority: {
+    low: "Low",
+    medium: "Medium",
+    high: "High",
+    critical: "Critical",
+  },
+
+  movement: {
+    receive: "Receive",
+    issue: "Issue",
+    adjust: "Adjust",
+    reverse: "Reverse",
+  },
+
+  system: {
+    toStatus: {
+      open: "Open",
+      in_progress: "In progress",
+      done: "Done",
+      cancelled: "Cancelled",
+      reassigned: "Reassigned",
+      rescheduled: "Rescheduled",
+      reprioritized: "Reprioritized",
+    },
+    notes: {
+      "PM-generated": "PM-generated",
+      "From report": "From report",
+      "Opening stock": "Opening stock",
+      "Closed on machine retirement": "Closed on machine retirement",
+      Unassigned: "Unassigned",
+      "No date": "No date",
+      Low: "Low",
+      Medium: "Medium",
+      High: "High",
+      Critical: "Critical",
+    },
+  },
+
+  public: {
+    reportingFor: "You're reporting a fault on",
+    heading: "Report a fault",
+    descLabel: "What's wrong?",
+    descPlaceholder:
+      "e.g. Loud grinding from the motor and it's leaking oil under the base.",
+    nameLabel: "Your name (optional)",
+    namePlaceholder: "e.g. Ivan",
+    photoLabel: "Add a photo (optional)",
+    photoAdd: "Take or choose a photo",
+    photoRemove: "Remove",
+    submit: "Send report",
+    submitting: "Sending…",
+    descRequired: "Please describe the problem.",
+    thanksHeading: "Reported",
+    thanksBody: "The maintenance team can see it now.",
+    reportAnother: "Report another fault",
+    statusHeading: "Your report",
+    received: "Received",
+    receivedBody: "The maintenance team has your report.",
+    working: "Being worked on",
+    workingBody: "Someone is on it now.",
+    fixed: "Fixed",
+    fixedBody: "This machine is running again.",
+    reviewed: "Reviewed",
+    reviewedBody: "The team reviewed your report.",
+    inactiveHeading: "This code isn't active",
+    inactiveBody: "Please tell a supervisor so they can check the machine.",
+  },
+
+  auth: {
+    tagline: "Maintenance Management System",
+    email: "Email",
+    emailPlaceholder: "name@company.com",
+    password: "Password",
+    forgotPassword: "Forgot password?",
+    incorrect: "Email or password is incorrect.",
+    tooManyAttempts: "Too many attempts. Wait a few minutes and try again.",
+    resetTitle: "Reset your password",
+    resetBody:
+      "Password reset by email is coming soon. For now, ask an admin to set a temporary password for you.",
+    backToSignIn: "Back to sign in",
+  },
+
+  setup: {
+    title: "Set up MMS",
+    intro:
+      "Create the first admin account and name your factory. This takes a minute.",
+    adminSection: "Admin account",
+    factorySection: "Factory",
+    name: "Your name",
+    passwordHint: (n: number) => `At least ${n} characters.`,
+    passwordTooShort: (n: number) => `Password must be at least ${n} characters.`,
+    factoryName: "Factory name",
+    timezone: "Timezone",
+    timezoneHint: "Used for every date, bucket, and scheduled job.",
+    submit: "Create account and continue",
+    nameRequired: "Enter your name.",
+    emailInvalid: "Enter a valid email.",
+    factoryNameRequired: "Enter the factory name.",
+    timezoneRequired: "Pick a timezone.",
+    checkForm: "Check the form.",
+  },
+
+  errors: {
+    notFoundTitle: "Page not found",
+    notFoundBody: "The link may be old or mistyped.",
+    notFoundBack: "Back to dashboard",
+    errorTitle: "Something went wrong",
+    errorBody: "Try again. If it keeps happening, ask an admin.",
+    errorRetry: "Try again",
+  },
+} satisfies Messages;
