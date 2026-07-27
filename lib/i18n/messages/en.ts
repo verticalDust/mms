@@ -141,6 +141,7 @@ export const en = {
       High: "High",
       Critical: "Critical",
     },
+    reversedOnWo: (wo) => `Reversed on ${wo}`,
   },
 
   parts: {

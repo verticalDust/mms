@@ -178,12 +178,12 @@ export default async function PartDetailPage({
                         {" → "}
                         <Mono className="text-slate-600">{m.balanceAfter}</Mono>
                         {(m.reason || m.note) && (
-                          <> · {translateSystemNote(m.reason || m.note!, t)}</>
+                          <> · {translateSystemNote(m.reason || m.note!, t, locale)}</>
                         )}
                       </>
                     ) : (
                       (m.reason || m.note
-                        ? translateSystemNote(m.reason || m.note!, t)
+                        ? translateSystemNote(m.reason || m.note!, t, locale)
                         : "—")
                     )}
                     {m.workOrderId && (

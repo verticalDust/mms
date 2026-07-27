@@ -305,11 +305,11 @@ function JobRow({
     <Link
       href={`/work-orders/${wo.id}`}
       className={cn(
-        "flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50",
+        "flex items-start gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0 hover:bg-slate-50",
         overdueRail && "border-l-[3px] border-l-red-600",
       )}
     >
-      <Mono className="w-16 shrink-0 text-[13px] text-slate-500">
+      <Mono className="w-14 shrink-0 pt-0.5 text-[13px] text-slate-500">
         WO-{wo.id}
       </Mono>
       <div className="min-w-0 flex-1">
@@ -318,11 +318,15 @@ function JobRow({
           <Mono>{wo.machineCode}</Mono> · {wo.machineName}
         </div>
       </div>
-      <div className="hidden shrink-0 sm:block">
-        <PriorityChip priority={wo.priority} />
-      </div>
-      <WorkStatusChip status={wo.status} />
-      <div className="w-24 shrink-0 text-right">
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        {/* Stack the chips on phones so the title keeps its width;
+            side-by-side once there's room (sm+) — mirrors the queue list. */}
+        <div className="flex flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-1.5">
+          <div className="hidden sm:block">
+            <PriorityChip priority={wo.priority} />
+          </div>
+          <WorkStatusChip status={wo.status} />
+        </div>
         <DueCell dueDate={wo.dueDate} timeZone={timeZone} bounds={bounds} />
       </div>
     </Link>

@@ -487,7 +487,7 @@ export default async function WorkOrderDetailPage({
                 </span>
                 {h.note && (
                   <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-slate-500">
-                    {translateSystemNote(h.note, t)}
+                    {translateSystemNote(h.note, t, locale)}
                   </p>
                 )}
               </div>

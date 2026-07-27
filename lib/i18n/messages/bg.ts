@@ -167,6 +167,8 @@ export const bg = {
       High: "Висок",
       Critical: "Критичен",
     },
+    // Code-generated reversal note (lib/stock.ts) — the WO ref passes through.
+    reversedOnWo: (wo: string) => `Сторнирано по ${wo}`,
   },
 
   // Shared part-picker / stock vocabulary (the job "add part" flow, the machine

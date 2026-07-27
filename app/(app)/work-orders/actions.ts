@@ -23,7 +23,6 @@ import {
   StockError,
   stockErrorMessage,
 } from "@/lib/stock";
-import { formatDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import type { Messages } from "@/lib/i18n/messages";
 import { advanceScheduleAfterCompletion } from "@/lib/pm";
@@ -349,10 +348,10 @@ export async function updateWorkOrderPlan(
   }
 
   // Log one activity row per field that actually changed; nothing on a no-op.
-  // STORED tokens — these notes are persisted in English and translated at
-  // display time via lib/i18n/system-notes (translateSystemNote). The literal
-  // "en" and "No date" here are the frozen write-side vocabulary; do NOT swap
-  // them for t.* or a live locale.
+  // STORED tokens — these notes are persisted locale-neutrally and localized at
+  // display time via lib/i18n/system-notes (translateSystemNote): "No date" and
+  // the priority labels are frozen English keys (do NOT swap them for t.* or a
+  // live locale); dates are stored as ISO timestamps and formatted per viewer.
   const events: { label: string; note: string }[] = [];
   if (wo.assigneeId !== newAssigneeId)
     events.push({ label: "reassigned", note: `${oldName} → ${newName}` });
@@ -361,8 +360,8 @@ export async function updateWorkOrderPlan(
   if (oldDueMs !== newDueMs)
     events.push({
       label: "rescheduled",
-      note: `${wo.dueDate ? formatDate(wo.dueDate, "en") : "No date"} → ${
-        newDue ? formatDate(newDue, "en") : "No date"
+      note: `${wo.dueDate ? wo.dueDate.toISOString() : "No date"} → ${
+        newDue ? newDue.toISOString() : "No date"
       }`,
     });
   if (wo.priority !== priority)
