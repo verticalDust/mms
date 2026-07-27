@@ -18,13 +18,17 @@ import {
   recentReportCookie,
   type CoarseStatus,
 } from "@/lib/reports";
-import { LANG_COOKIE } from "@/lib/i18n/config";
+import { LANG_COOKIE, pickLocale, type Locale } from "@/lib/i18n/config";
+import { getMessages } from "@/lib/i18n/messages";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { Mono } from "@/components/ui";
-import { PublicLangToggle } from "@/components/public-lang-toggle";
-import { messages, pickLang, type Lang } from "./messages";
+import { LangSwitcher } from "@/components/lang-switcher";
 import { ReportForm } from "./report-form";
 
-export const metadata = { title: "Report a fault · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.reportFault };
+}
 
 // The QR-label target. One URL, auth decides the view (PLAN §1.5):
 //   • signed-in staff  → the internal machine page
@@ -52,13 +56,13 @@ export default async function ScanPage({
   if (machine && user) redirect(`/machines/${machine.id}`);
 
   const jar = await cookies();
-  const lang = pickLang(jar.get(LANG_COOKIE)?.value);
-  const t = messages[lang];
+  const locale = pickLocale(jar.get(LANG_COOKIE)?.value);
+  const t = getMessages(locale).public;
 
   // Dead / retired / mangled → friendly page (§7.4), no internal data.
   if (!machine || machine.retiredAt) {
     return (
-      <PublicShell lang={lang}>
+      <PublicShell>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
           <TriangleAlert className="h-6 w-6" />
         </div>
@@ -80,7 +84,7 @@ export default async function ScanPage({
     if (report && report.machineId === machine.id) {
       return (
         <StatusView
-          lang={lang}
+          locale={locale}
           code={code}
           machineName={machine.name}
           machineCode={machine.code}
@@ -97,7 +101,7 @@ export default async function ScanPage({
         code={code}
         machineCode={machine.code}
         machineName={machine.name}
-        defaultLang={lang}
+        defaultLocale={locale}
         photosEnabled={photosEnabled()}
       />
       <Wordmark />
@@ -116,19 +120,19 @@ const STATUS_STYLE: Record<
 };
 
 function StatusView({
-  lang,
+  locale,
   code,
   machineName,
   machineCode,
   status,
 }: {
-  lang: Lang;
+  locale: Locale;
   code: string;
   machineName: string;
   machineCode: string;
   status: CoarseStatus;
 }) {
-  const t = messages[lang];
+  const t = getMessages(locale).public;
   const label = {
     received: t.received,
     working: t.working,
@@ -144,7 +148,7 @@ function StatusView({
   const s = STATUS_STYLE[status];
   const Icon = s.icon;
   return (
-    <PublicShell lang={lang}>
+    <PublicShell>
       <div className="text-[13px] text-slate-500">{t.statusHeading}</div>
       <Mono className="mt-1 block text-[13px] font-medium text-slate-500">
         {machineCode}
@@ -175,18 +179,14 @@ function StatusView({
 // Shared centered card for the static public surfaces (status + dead-link), with
 // the language toggle and the MMS wordmark. The form supplies its own shell so
 // its instant toggle can live inline without a reload.
-function PublicShell({
-  lang,
-  children,
-}: {
-  lang: Lang;
-  children: React.ReactNode;
-}) {
+function PublicShell({ children }: { children: React.ReactNode }) {
+  // The switcher reads the locale from the root I18nProvider (resolved from the
+  // same cookie this page read), so it always agrees with what rendered.
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-5 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-3 flex justify-end">
-          <PublicLangToggle lang={lang} />
+          <LangSwitcher mode="cookie" />
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm">
           {children}

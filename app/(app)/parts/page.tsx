@@ -5,8 +5,12 @@ import { searchParts } from "@/lib/queries";
 import { buttonClass, Mono, EmptyState } from "@/components/ui";
 import { StockStatusChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 
-export const metadata = { title: "Parts · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.parts };
+}
 
 const rail: Record<string, string> = {
   out: "border-l-red-600",
@@ -20,6 +24,7 @@ export default async function PartsPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
+  const t = await getT();
   const sp = await searchParams;
 
   const q = typeof sp.q === "string" ? sp.q : "";
@@ -32,23 +37,23 @@ export default async function PartsPage({
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          Parts
+          {t.nav.parts}
         </h1>
         {user.role === "admin" && (parts.length > 0 || filtered) && (
           <Link href="/parts/new" className={buttonClass("primary")}>
             <Plus className="h-4 w-4" />
-            Add part
+            {t.parts.addPart}
           </Link>
         )}
       </div>
 
       <SearchFilterBar
-        placeholder="Search SKU, name or bin…"
+        placeholder={t.parts.searchSkuNameBin}
         chips={[
           {
             param: "low",
-            allLabel: "All parts",
-            options: [{ value: "1", label: "Low stock" }],
+            allLabel: t.parts.allParts,
+            options: [{ value: "1", label: t.parts.lowStockChip }],
           },
         ]}
       />
@@ -57,27 +62,27 @@ export default async function PartsPage({
         low && !q ? (
           <EmptyState
             icon={<CircleCheck className="h-6 w-6 text-green-600" />}
-            title="Nothing to reorder. Every part is at or above its minimum."
+            title={t.parts.nothingToReorder}
           />
         ) : filtered ? (
           <EmptyState
             icon={<SearchX className="h-6 w-6" />}
-            title="No parts match these filters."
+            title={t.parts.emptyNoMatch}
             action={
               <Link href="/parts" className={buttonClass("secondary")}>
-                Clear filters
+                {t.common.clearFiltersAction}
               </Link>
             }
           />
         ) : (
           <EmptyState
             icon={<Package className="h-6 w-6" />}
-            title="No parts yet."
+            title={t.parts.emptyNone}
             action={
               user.role === "admin" ? (
                 <Link href="/parts/new" className={buttonClass("primary")}>
                   <Plus className="h-4 w-4" />
-                  Add part
+                  {t.parts.addPart}
                 </Link>
               ) : undefined
             }
@@ -102,7 +107,7 @@ export default async function PartsPage({
                   </div>
                   {p.binLocation && (
                     <div className="truncate text-[13px] text-slate-500">
-                      bin <Mono>{p.binLocation}</Mono>
+                      {t.parts.bin} <Mono>{p.binLocation}</Mono>
                     </div>
                   )}
                 </div>
@@ -110,7 +115,9 @@ export default async function PartsPage({
                   <Mono className="text-[15px] text-slate-900">{p.onHand}</Mono>
                   <span className="text-[12px] text-slate-500"> / {p.minLevel}</span>
                   {p.stock !== "ok" && short > 0 && (
-                    <div className="text-[12px] text-amber-700">need {short}</div>
+                    <div className="text-[12px] text-amber-700">
+                      {t.parts.need(short)}
+                    </div>
                   )}
                 </div>
                 <StockStatusChip level={p.stock} />

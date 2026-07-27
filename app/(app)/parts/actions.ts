@@ -8,24 +8,27 @@ import { db } from "@/lib/db";
 import { parts, stockMovements } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
+import { getT } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/messages";
 import {
   recordMovement,
   recordMovementTx,
   StockError,
-  insufficientMessage,
+  stockErrorMessage,
 } from "@/lib/stock";
 
 export type FormState = { error?: string };
 export type StockFormState = { ok?: boolean; error?: string };
 
-const catalogSchema = z.object({
-  sku: z.string().trim().min(1, "SKU is required."),
-  name: z.string().trim().min(1, "Name is required."),
-  unit: z.string().trim().optional(),
-  binLocation: z.string().trim().optional(),
-  minLevel: z.coerce.number().int().min(0, "Minimum can't be negative."),
-  unitCost: z.coerce.number().min(0).optional(),
-});
+const catalogSchema = (t: Messages) =>
+  z.object({
+    sku: z.string().trim().min(1, t.parts.errSkuRequired),
+    name: z.string().trim().min(1, t.parts.errNameRequired),
+    unit: z.string().trim().optional(),
+    binLocation: z.string().trim().optional(),
+    minLevel: z.coerce.number().int().min(0, t.parts.errMinNegative),
+    unitCost: z.coerce.number().min(0).optional(),
+  });
 
 function revalidatePart(partId: number) {
   revalidatePath(`/parts/${partId}`);
@@ -38,14 +41,15 @@ export async function createPart(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "part:manage");
   } catch {
-    return { error: "Only an admin can add parts." };
+    return { error: t.parts.errOnlyAdminAdd };
   }
 
-  const parsed = catalogSchema
+  const parsed = catalogSchema(t)
     .extend({ initialQty: z.coerce.number().int().min(0) })
     .safeParse({
       sku: formData.get("sku"),
@@ -57,7 +61,7 @@ export async function createPart(
       initialQty: formData.get("initialQty") || 0,
     });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
   const d = parsed.data;
 
@@ -87,6 +91,7 @@ export async function createPart(
           type: "receive",
           quantity: d.initialQty,
           balanceAfter: d.initialQty,
+          // STORED token — translated at display via lib/i18n/system-notes.
           reason: "Opening stock",
           actorId: user.id,
         });
@@ -98,7 +103,7 @@ export async function createPart(
     });
   } catch (e) {
     if (String(e).includes("UNIQUE")) {
-      return { error: `A part with SKU ${d.sku} already exists.` };
+      return { error: t.parts.errSkuExists(d.sku) };
     }
     throw e;
   }
@@ -113,17 +118,18 @@ export async function updatePart(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "part:manage");
   } catch {
-    return { error: "Only an admin can edit parts." };
+    return { error: t.parts.errOnlyAdminEdit };
   }
 
   const id = Number(formData.get("id"));
-  if (!Number.isInteger(id)) return { error: "Unknown part." };
+  if (!Number.isInteger(id)) return { error: t.parts.errUnknownPart };
 
-  const parsed = catalogSchema.safeParse({
+  const parsed = catalogSchema(t).safeParse({
     sku: formData.get("sku"),
     name: formData.get("name"),
     unit: formData.get("unit") || undefined,
@@ -132,7 +138,7 @@ export async function updatePart(
     unitCost: formData.get("unitCost") || undefined,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
   const d = parsed.data;
 
@@ -153,7 +159,7 @@ export async function updatePart(
       .where(eq(parts.id, id));
   } catch (e) {
     if (String(e).includes("UNIQUE")) {
-      return { error: `A part with SKU ${d.sku} already exists.` };
+      return { error: t.parts.errSkuExists(d.sku) };
     }
     throw e;
   }
@@ -167,20 +173,21 @@ export async function receiveStock(
   formData: FormData,
 ): Promise<StockFormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "stock:receive");
   } catch {
-    return { error: "You can't receive stock." };
+    return { error: t.parts.errCantReceive };
   }
 
   const partId = Number(formData.get("partId"));
   const qty = Number(formData.get("qty"));
   const note = String(formData.get("note") ?? "").trim();
   const costRaw = formData.get("unitCost");
-  if (!Number.isInteger(partId)) return { error: "Unknown part." };
+  if (!Number.isInteger(partId)) return { error: t.parts.errUnknownPart };
   if (!Number.isInteger(qty) || qty <= 0)
-    return { error: "Enter a whole quantity greater than zero." };
+    return { error: t.parts.errQtyPositive };
 
   // Optional new unit cost, applied in the SAME transaction as the receive so
   // the movement and the cost update commit together (never one without the other).
@@ -207,7 +214,7 @@ export async function receiveStock(
       }
     });
   } catch (e) {
-    if (e instanceof StockError) return { error: e.message };
+    if (e instanceof StockError) return { error: stockErrorMessage(e, t) };
     throw e;
   }
 
@@ -220,19 +227,20 @@ export async function issueStock(
   formData: FormData,
 ): Promise<StockFormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "stock:issue");
   } catch {
-    return { error: "You can't issue stock." };
+    return { error: t.parts.errCantIssue };
   }
 
   const partId = Number(formData.get("partId"));
   const qty = Number(formData.get("qty"));
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!Number.isInteger(partId)) return { error: "Unknown part." };
+  if (!Number.isInteger(partId)) return { error: t.parts.errUnknownPart };
   if (!Number.isInteger(qty) || qty <= 0)
-    return { error: "Enter a whole quantity greater than zero." };
+    return { error: t.parts.errQtyPositive };
 
   try {
     await recordMovement({
@@ -243,13 +251,9 @@ export async function issueStock(
       actorId: user.id,
     });
   } catch (e) {
-    if (e instanceof StockError) {
-      // Insufficient stock shows the recorded on-hand + bin so the tech can
-      // reconcile the shelf (SCREENS §6) rather than a bare rejection.
-      return {
-        error: e.code === "INSUFFICIENT" ? insufficientMessage(e) : e.message,
-      };
-    }
+    // Insufficient stock shows the recorded on-hand + bin so the tech can
+    // reconcile the shelf (SCREENS §6) rather than a bare rejection.
+    if (e instanceof StockError) return { error: stockErrorMessage(e, t) };
     throw e;
   }
 
@@ -262,20 +266,21 @@ export async function adjustStock(
   formData: FormData,
 ): Promise<StockFormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "stock:adjust");
   } catch {
-    return { error: "Only an admin can adjust the count." };
+    return { error: t.parts.errOnlyAdminAdjust };
   }
 
   const partId = Number(formData.get("partId"));
   const counted = Number(formData.get("counted"));
   const reason = String(formData.get("reason") ?? "").trim();
-  if (!Number.isInteger(partId)) return { error: "Unknown part." };
+  if (!Number.isInteger(partId)) return { error: t.parts.errUnknownPart };
   if (!Number.isInteger(counted) || counted < 0)
-    return { error: "Enter the counted quantity (zero or more)." };
-  if (!reason) return { error: "A reason is required to adjust the count." };
+    return { error: t.parts.errCountedQty };
+  if (!reason) return { error: t.parts.errReasonRequired };
 
   try {
     await recordMovement({
@@ -286,7 +291,7 @@ export async function adjustStock(
       actorId: user.id,
     });
   } catch (e) {
-    if (e instanceof StockError) return { error: e.message };
+    if (e instanceof StockError) return { error: stockErrorMessage(e, t) };
     throw e;
   }
 

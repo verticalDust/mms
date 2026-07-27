@@ -13,15 +13,9 @@ import { StockDialog } from "../stock-dialog";
 import { PhotoUpload } from "./photo-upload";
 import { PartThumb } from "./part-thumb";
 import { formatDate, formatTime } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { translateSystemNote } from "@/lib/i18n/system-notes";
 import { cn } from "@/lib/cn";
-
-const MOVEMENT_LABEL: Record<string, string> = {
-  receive: "Receive",
-  issue: "Issue",
-  adjust: "Adjust",
-  reverse: "Reverse",
-};
 
 export default async function PartDetailPage({
   params,
@@ -30,6 +24,7 @@ export default async function PartDetailPage({
 }) {
   const user = await requireUser();
   const locale = await getLocale();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -72,7 +67,7 @@ export default async function PartDetailPage({
         className="inline-flex items-center gap-1.5 text-[14px] text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        Parts
+        {t.nav.parts}
       </Link>
 
       {/* Nameplate header */}
@@ -82,7 +77,7 @@ export default async function PartDetailPage({
             {part.photoPath && (
               <PartThumb
                 src={`/parts/${part.id}/photo?v=${part.updatedAt.getTime()}`}
-                alt={`Photo of ${part.name}`}
+                alt={t.parts.photoAlt(part.name)}
               />
             )}
             <div className="min-w-0">
@@ -95,7 +90,7 @@ export default async function PartDetailPage({
               {part.binLocation && (
                 <div className="mt-1 flex items-center gap-1.5 text-[14px] text-slate-500">
                   <MapPin className="h-4 w-4" />
-                  bin <Mono>{part.binLocation}</Mono>
+                  {t.parts.bin} <Mono>{part.binLocation}</Mono>
                 </div>
               )}
             </div>
@@ -108,7 +103,7 @@ export default async function PartDetailPage({
               </Mono>
               <span className="text-[13px] text-slate-500"> {part.unit}</span>
               <div className="text-[12px] text-slate-500">
-                min <Mono>{part.minLevel}</Mono>
+                {t.parts.min} <Mono>{part.minLevel}</Mono>
               </div>
             </div>
           </div>
@@ -148,7 +143,7 @@ export default async function PartDetailPage({
               className={cn(buttonClass("secondary"), "sm:ml-auto")}
             >
               <Pencil className="h-4 w-4" />
-              Edit
+              {t.common.edit}
             </Link>
           )}
         </div>
@@ -156,11 +151,11 @@ export default async function PartDetailPage({
 
       {/* Movement ledger — the running balance sums exactly to on-hand (inv #1) */}
       <div className="flex flex-col gap-3">
-        <SectionLabel>Movement ledger</SectionLabel>
+        <SectionLabel>{t.parts.ledgerLabel}</SectionLabel>
         {shown.length === 0 ? (
           <EmptyState
             icon={<Package className="h-6 w-6" />}
-            title="No stock movements yet. Receive some to start the ledger."
+            title={t.parts.ledgerEmpty}
           />
         ) : (
           <>
@@ -171,7 +166,7 @@ export default async function PartDetailPage({
                 className="flex items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
               >
                 <span className="w-16 shrink-0 font-condensed text-[13px] font-medium tracking-wide text-slate-600">
-                  {MOVEMENT_LABEL[m.type] ?? m.type}
+                  {t.movement[m.type as keyof typeof t.movement] ?? m.type}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[14px] text-slate-700">
@@ -182,10 +177,14 @@ export default async function PartDetailPage({
                         </Mono>
                         {" → "}
                         <Mono className="text-slate-600">{m.balanceAfter}</Mono>
-                        {(m.reason || m.note) && <> · {m.reason || m.note}</>}
+                        {(m.reason || m.note) && (
+                          <> · {translateSystemNote(m.reason || m.note!, t)}</>
+                        )}
                       </>
                     ) : (
-                      m.reason || m.note || "—"
+                      (m.reason || m.note
+                        ? translateSystemNote(m.reason || m.note!, t)
+                        : "—")
                     )}
                     {m.workOrderId && (
                       <Link
@@ -216,7 +215,8 @@ export default async function PartDetailPage({
                     {m.quantity}
                   </Mono>
                   <div className="text-[12px] text-slate-500">
-                    bal <Mono className="text-slate-600">{m.balanceAfter}</Mono>
+                    {t.parts.bal}{" "}
+                    <Mono className="text-slate-600">{m.balanceAfter}</Mono>
                   </div>
                 </div>
               </div>
@@ -224,8 +224,7 @@ export default async function PartDetailPage({
           </div>
           {truncated && (
             <p className="mt-1 text-[13px] text-slate-500">
-              Showing the latest {LEDGER_CAP} movements — older entries aren&rsquo;t
-              listed.
+              {t.parts.ledgerTruncated(LEDGER_CAP)}
             </p>
           )}
           </>
@@ -234,9 +233,9 @@ export default async function PartDetailPage({
 
       {/* Fits machines — the reverse of the machine Parts section (E2-S10) */}
       <div className="flex flex-col gap-3">
-        <SectionLabel>Fits machines</SectionLabel>
+        <SectionLabel>{t.parts.fitsMachines}</SectionLabel>
         {fitsMachines.length === 0 ? (
-          <EmptyState title="Not linked to any machine yet." />
+          <EmptyState title={t.parts.notLinkedMachine} />
         ) : (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {fitsMachines.map((m) => (
@@ -253,7 +252,7 @@ export default async function PartDetailPage({
                 </div>
                 {m.retired && (
                   <StatusChip tone="slate" icon={Ban}>
-                    Retired
+                    {t.status.machine.retired}
                   </StatusChip>
                 )}
               </Link>

@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
 import { createPart, updatePart, type FormState } from "./actions";
 
 type Existing = {
@@ -29,13 +30,14 @@ export function PartForm({
     editing ? updatePart : createPart,
     {},
   );
+  const t = useT();
   return (
     <form action={action} className="flex flex-col gap-4">
       {part && <input type="hidden" name="id" value={part.id} />}
       <Field
-        label="SKU"
+        label={t.parts.skuField}
         htmlFor="sku"
-        hint={editing ? undefined : "Suggested for you. Replace with the real part number."}
+        hint={editing ? undefined : t.parts.skuHint}
       >
         <Input
           id="sku"
@@ -46,23 +48,23 @@ export function PartForm({
           className="font-mono"
         />
       </Field>
-      <Field label="Name" htmlFor="name">
+      <Field label={t.parts.nameField} htmlFor="name">
         <Input id="name" name="name" required defaultValue={part?.name} />
       </Field>
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Unit" htmlFor="unit">
+        <Field label={t.parts.unitField} htmlFor="unit">
           <Input
             id="unit"
             name="unit"
-            placeholder="pcs"
+            placeholder={t.parts.unitPlaceholder}
             defaultValue={part?.unit ?? ""}
           />
         </Field>
-        <Field label="Bin" htmlFor="binLocation">
+        <Field label={t.parts.binField} htmlFor="binLocation">
           <Input
             id="binLocation"
             name="binLocation"
-            placeholder="e.g. B-3"
+            placeholder={t.parts.binPlaceholder}
             defaultValue={part?.binLocation ?? ""}
             className="font-mono"
           />
@@ -70,9 +72,9 @@ export function PartForm({
       </div>
       <div className="grid grid-cols-2 gap-4">
         <Field
-          label="Minimum level"
+          label={t.parts.minLevelField}
           htmlFor="minLevel"
-          hint="Reorder at or below this."
+          hint={t.parts.minLevelHint}
         >
           <Input
             id="minLevel"
@@ -85,7 +87,7 @@ export function PartForm({
             className="font-mono"
           />
         </Field>
-        <Field label="Unit cost" htmlFor="unitCost" hint="Optional.">
+        <Field label={t.parts.unitCostField} htmlFor="unitCost" hint={t.parts.unitCostHint}>
           <Input
             id="unitCost"
             name="unitCost"
@@ -100,9 +102,9 @@ export function PartForm({
       </div>
       {!editing && (
         <Field
-          label="Quantity on hand now"
+          label={t.parts.openingQtyField}
           htmlFor="initialQty"
-          hint="Optional opening stock, recorded as the first ledger movement."
+          hint={t.parts.openingQtyHint}
         >
           <Input
             id="initialQty"
@@ -121,7 +123,9 @@ export function PartForm({
           {state.error}
         </p>
       )}
-      <SubmitButton>{editing ? "Save changes" : "Save part"}</SubmitButton>
+      <SubmitButton>
+        {editing ? t.common.saveChanges : t.parts.savePart}
+      </SubmitButton>
     </form>
   );
 }

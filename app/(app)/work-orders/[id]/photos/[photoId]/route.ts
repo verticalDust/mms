@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { photos, workOrders } from "@/lib/db/schema";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
+import { getT } from "@/lib/i18n/server";
 import { readPhoto, deletePhoto } from "@/lib/uploads";
 
 // Resolve a photo only when it truly belongs to this work order (guards against
@@ -55,16 +56,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; photoId: string }> },
 ) {
   const user = await getCurrentUser();
+  const t = await getT();
   if (!user)
-    return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+    return NextResponse.json({ error: t.common.notSignedIn }, { status: 401 });
   const { id, photoId } = await params;
   const woId = Number(id);
   const pid = Number(photoId);
   if (!Number.isInteger(woId) || !Number.isInteger(pid))
-    return NextResponse.json({ error: "Not found." }, { status: 404 });
+    return NextResponse.json({ error: t.photos.notFound }, { status: 404 });
 
   const ph = await findPhoto(woId, pid);
-  if (!ph) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (!ph) return NextResponse.json({ error: t.photos.notFound }, { status: 404 });
 
   const [wo] = await db
     .select({ status: workOrders.status })
@@ -72,14 +74,11 @@ export async function DELETE(
     .where(eq(workOrders.id, woId))
     .limit(1);
   if (!wo || wo.status === "done" || wo.status === "cancelled")
-    return NextResponse.json(
-      { error: "This job is closed. Photos are locked." },
-      { status: 409 },
-    );
+    return NextResponse.json({ error: t.photos.jobClosed }, { status: 409 });
   // Only the uploader or an admin can remove a photo.
   if (user.role !== "admin" && ph.uploadedBy !== user.id)
     return NextResponse.json(
-      { error: "Only the person who added it (or an admin) can remove it." },
+      { error: t.photos.onlyOwnerRemove },
       { status: 403 },
     );
 

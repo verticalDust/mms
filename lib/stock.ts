@@ -6,6 +6,7 @@ import {
   workOrderParts,
   workOrders,
 } from "@/lib/db/schema";
+import type { Messages } from "@/lib/i18n/messages";
 
 // Invariant #1 lives here. Every change to stock goes through recordMovement,
 // which inserts a signed movement AND updates parts.onHand in ONE transaction,
@@ -34,12 +35,15 @@ export class StockError extends Error {
   }
 }
 
-// One phrasing for "not enough stock", shared by every issue path (stock issue
-// and logging parts on a job) so the same shortage always reads the same way.
-export function insufficientMessage(e: StockError): string {
-  return `Not enough in stock: ${e.onHand ?? 0} on hand${
-    e.bin ? `, bin ${e.bin}` : ""
-  }. Adjust the count if the shelf disagrees.`;
+// Translate a StockError for display, by code. The messages carried on the
+// StockError itself stay English for logs; the UI text comes from the catalog.
+// INVALID paths are defensive races (the actions pre-validate), so they collapse
+// to one generic message.
+export function stockErrorMessage(e: StockError, t: Messages): string {
+  if (e.code === "INSUFFICIENT")
+    return t.stock.insufficient(e.onHand ?? 0, e.bin ?? null);
+  if (e.code === "NOT_FOUND") return t.stock.partGone;
+  return t.stock.invalid;
 }
 
 type MovementInput = {

@@ -6,9 +6,13 @@ import { requireAdmin } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { machines, users } from "@/lib/db/schema";
 import { Mono } from "@/components/ui";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { PmScheduleForm } from "../pm-schedule-form";
 
-export const metadata = { title: "New PM schedule · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.newPmSchedule };
+}
 
 export default async function NewPmSchedulePage({
   params,
@@ -16,6 +20,7 @@ export default async function NewPmSchedulePage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const machineId = Number((await params).id);
   if (!Number.isInteger(machineId)) notFound();
 
@@ -43,15 +48,15 @@ export default async function NewPmSchedulePage({
       </Link>
       <div>
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          New PM schedule
+          {t.machines.newPmScheduleTitle}
         </h1>
         <p className="mt-0.5 text-[14px] text-slate-500">
-          For <Mono>{machine.code}</Mono> · {machine.name}
+          {t.machines.forMachine(machine.code, machine.name)}
         </p>
       </div>
       {machine.retiredAt ? (
         <p className="rounded-lg border border-slate-200 bg-white p-4 text-[14px] text-slate-600">
-          This machine is retired. Bring it back into service before scheduling PM.
+          {t.machines.retiredNoPm}
         </p>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-6">

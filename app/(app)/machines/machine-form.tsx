@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Field, Input, Textarea } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
 import { createMachine, updateMachine, type FormState } from "./actions";
 
 type Existing = {
@@ -26,10 +27,11 @@ export function MachineForm({
     editing ? updateMachine : createMachine,
     {},
   );
+  const t = useT();
   return (
     <form action={action} className="flex flex-col gap-4">
       {machine && <input type="hidden" name="id" value={machine.id} />}
-      <Field label="Name" htmlFor="name">
+      <Field label={t.machines.nameField} htmlFor="name">
         <Input
           id="name"
           name="name"
@@ -39,13 +41,9 @@ export function MachineForm({
         />
       </Field>
       <Field
-        label="Code"
+        label={t.machines.codeField}
         htmlFor="code"
-        hint={
-          editing
-            ? "Changing this changes what its QR label points to. Reprint if it's already mounted."
-            : "Suggested for you. Change it if you have your own scheme."
-        }
+        hint={editing ? t.machines.codeHintEdit : t.machines.codeHintNew}
       >
         <Input
           id="code"
@@ -54,15 +52,15 @@ export function MachineForm({
           className="font-mono"
         />
       </Field>
-      <Field label="Location" htmlFor="location">
+      <Field label={t.machines.locationField} htmlFor="location">
         <Input
           id="location"
           name="location"
-          placeholder="e.g. Line B, bay 3"
+          placeholder={t.machines.locationPlaceholder}
           defaultValue={machine?.location ?? ""}
         />
       </Field>
-      <Field label="Notes" htmlFor="notes">
+      <Field label={t.machines.notesField} htmlFor="notes">
         <Textarea id="notes" name="notes" defaultValue={machine?.notes ?? ""} />
       </Field>
       {state.error && (
@@ -70,7 +68,9 @@ export function MachineForm({
           {state.error}
         </p>
       )}
-      <SubmitButton>{editing ? "Save changes" : "Save machine"}</SubmitButton>
+      <SubmitButton>
+        {editing ? t.common.saveChanges : t.machines.saveMachine}
+      </SubmitButton>
     </form>
   );
 }

@@ -13,6 +13,7 @@ import { Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { Input, buttonClass } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { cn } from "@/lib/cn";
+import { useT } from "@/lib/i18n/client";
 import {
   addChecklistItem,
   removeChecklistItem,
@@ -76,6 +77,7 @@ function ChecklistItemRow({
   const [pending, start] = useTransition();
   const [optimisticChecked, setOptimistic] = useOptimistic(item.checked);
   const [failed, setFailed] = useState(false);
+  const t = useT();
   const inputId = `chk-${item.id}`;
 
   function toggle() {
@@ -117,12 +119,12 @@ function ChecklistItemRow({
         </label>
         {optimisticChecked && item.stamp && (
           <p className="mt-0.5 text-[12px] text-slate-500">
-            Ticked · {item.stamp}
+            {t.workOrders.ticked} · {item.stamp}
           </p>
         )}
         {failed && (
           <p role="alert" className="mt-0.5 text-[12px] text-red-600">
-            Couldn&rsquo;t save. Try again.
+            {t.workOrders.saveFailed}
           </p>
         )}
       </div>
@@ -135,9 +137,9 @@ function ChecklistItemRow({
           <input type="hidden" name="workOrderId" value={workOrderId} />
           <ConfirmSubmit
             compact
-            label={`Remove step: ${item.text}`}
+            label={t.workOrders.removeStepLabel(item.text)}
             icon={<Trash2 className="h-4 w-4" />}
-            message={`Remove this step?\n\n"${item.text}"`}
+            message={t.workOrders.removeStepConfirm(item.text)}
           />
         </form>
       )}
@@ -151,6 +153,7 @@ function AddStepForm({ workOrderId }: { workOrderId: number }) {
     {},
   );
   const formRef = useRef<HTMLFormElement>(null);
+  const t = useT();
 
   // Clear the input once a step lands so the planner can type the next one.
   useEffect(() => {
@@ -163,9 +166,9 @@ function AddStepForm({ workOrderId }: { workOrderId: number }) {
       <div className="flex gap-2">
         <Input
           name="text"
-          placeholder="Add a step…"
+          placeholder={t.workOrders.addStepPlaceholder}
           maxLength={200}
-          aria-label="New checklist step"
+          aria-label={t.workOrders.newStepAria}
           className="flex-1"
         />
         <AddButton />
@@ -181,6 +184,7 @@ function AddStepForm({ workOrderId }: { workOrderId: number }) {
 
 function AddButton() {
   const { pending } = useFormStatus();
+  const t = useT();
   return (
     <button
       type="submit"
@@ -192,7 +196,7 @@ function AddButton() {
       ) : (
         <Plus className="h-4 w-4" />
       )}
-      Add
+      {t.common.add}
     </button>
   );
 }

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2, RefreshCw } from "lucide-react";
 import { buttonClass } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 import { generatePmNow, type GenerateState } from "./actions";
 
 // Manual trigger for the same idempotent generation the daily cron runs — lets a
@@ -13,14 +14,15 @@ export function GeneratePmButton() {
     generatePmNow,
     {},
   );
+  const t = useT();
   return (
     <form action={action} className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <GenButton />
       {state.generated != null && (
         <span className="text-[13px] text-slate-500">
           {state.generated === 0
-            ? "Nothing due. All caught up."
-            : `Generated ${state.generated} job${state.generated === 1 ? "" : "s"}.`}
+            ? t.pm.nothingDue
+            : t.pm.generated(state.generated)}
         </span>
       )}
       {state.error && (
@@ -34,6 +36,7 @@ export function GeneratePmButton() {
 
 function GenButton() {
   const { pending } = useFormStatus();
+  const t = useT();
   return (
     <button
       type="submit"
@@ -45,7 +48,7 @@ function GenButton() {
       ) : (
         <RefreshCw className="h-4 w-4" />
       )}
-      Generate due jobs
+      {t.pm.generateDue}
     </button>
   );
 }

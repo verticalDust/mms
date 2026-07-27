@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 
 export function PhotoUpload({
   partId,
@@ -13,6 +14,7 @@ export function PhotoUpload({
   hasPhoto: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"upload" | "remove" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,10 @@ export function PhotoUpload({
     setError(null);
     setBusy("upload");
     try {
-      const blob = await compress(file);
+      const blob = await compress(file, {
+        processFail: t.workOrders.imageProcessFailed,
+        readFail: t.workOrders.imageReadFailed,
+      });
       const fd = new FormData();
       fd.append("photo", blob, "photo.jpg");
       const res = await fetch(`/parts/${partId}/photo`, {
@@ -30,11 +35,11 @@ export function PhotoUpload({
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "Upload failed.");
+        throw new Error(j.error || t.workOrders.uploadFailed);
       }
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
+      setError(e instanceof Error ? e.message : t.workOrders.uploadFailed);
     } finally {
       setBusy(null);
     }
@@ -48,7 +53,7 @@ export function PhotoUpload({
       if (!res.ok) throw new Error();
       router.refresh();
     } catch {
-      setError("Couldn't remove the photo.");
+      setError(t.workOrders.removePhotoFailed);
     } finally {
       setBusy(null);
     }
@@ -80,7 +85,7 @@ export function PhotoUpload({
           ) : (
             <Camera className="h-4 w-4" />
           )}
-          {hasPhoto ? "Replace photo" : "Add photo"}
+          {hasPhoto ? t.parts.replacePhoto : t.parts.addPhoto}
         </button>
         {hasPhoto && (
           <button
@@ -94,7 +99,7 @@ export function PhotoUpload({
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            Remove
+            {t.parts.removePhotoShort}
           </button>
         )}
       </div>
@@ -110,7 +115,10 @@ export function PhotoUpload({
 // Downscale to ≤1024px on the long edge and re-encode as JPEG (q0.8) in the
 // browser, so uploads stay small without a server-side image lib (matches the
 // "client-compressed" approach the photo briefs call for). Node 25 friendly.
-function compress(file: File): Promise<Blob> {
+function compress(
+  file: File,
+  msgs: { processFail: string; readFail: string },
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -127,17 +135,17 @@ function compress(file: File): Promise<Blob> {
       canvas.height = height;
       const ctx = canvas.getContext("2d");
       URL.revokeObjectURL(url);
-      if (!ctx) return reject(new Error("Couldn't process the image."));
+      if (!ctx) return reject(new Error(msgs.processFail));
       ctx.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error("Couldn't process the image."))),
+        (b) => (b ? resolve(b) : reject(new Error(msgs.processFail))),
         "image/jpeg",
         0.8,
       );
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Couldn't read that image."));
+      reject(new Error(msgs.readFail));
     };
     img.src = url;
   });

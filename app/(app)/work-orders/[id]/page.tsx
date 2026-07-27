@@ -44,8 +44,12 @@ import {
   downtimeSince,
   formatDuration,
 } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
 import { INTL_LOCALE } from "@/lib/i18n/config";
+import {
+  historyStatusLabel,
+  translateSystemNote,
+} from "@/lib/i18n/system-notes";
 import { startWork, completeWork, removePartFromJob } from "../actions";
 import { JobPhotos } from "./job-photos";
 import { PlanRow } from "./plan-row";
@@ -59,6 +63,7 @@ export default async function WorkOrderDetailPage({
 }) {
   const user = await requireUser();
   const locale = await getLocale();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -168,13 +173,7 @@ export default async function WorkOrderDetailPage({
   // Warn (don't block) if a job is finished with steps still unticked — floor
   // reality wins, but name what's being skipped so it's a choice, not an oversight.
   const doneWarning =
-    uncheckedSteps.length > 0
-      ? `${uncheckedSteps.length} step${
-          uncheckedSteps.length === 1 ? "" : "s"
-        } not ticked:\n\n${uncheckedSteps
-          .map((s) => `• ${s}`)
-          .join("\n")}\n\nMark the job done anyway?`
-      : null;
+    uncheckedSteps.length > 0 ? t.workOrders.doneWarning(uncheckedSteps) : null;
 
   // Breakdown → downtime (E3-S8). A job resolves at most one period: if it has
   // already closed one, show the stopped time it logged; only otherwise (and
@@ -195,7 +194,7 @@ export default async function WorkOrderDetailPage({
         className="inline-flex items-center gap-1.5 text-[14px] text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        Work orders
+        {t.nav.workOrders}
       </Link>
 
       {/* Nameplate header */}
@@ -209,7 +208,7 @@ export default async function WorkOrderDetailPage({
               {wo.source === "pm" && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                   <CalendarClock className="h-3 w-3" />
-                  PM
+                  {t.navShort.pm}
                 </span>
               )}
             </div>
@@ -232,7 +231,7 @@ export default async function WorkOrderDetailPage({
         <PlanRow
           workOrderId={wo.id}
           canManage={canManage}
-          assigneeName={wo.assigneeName ?? "Unassigned"}
+          assigneeName={wo.assigneeName ?? t.workOrders.unassigned}
           dueLabel={wo.dueDate ? formatDate(wo.dueDate, locale) : null}
           assigneeId={wo.assigneeId}
           dueValue={wo.dueDate ? toDateInputValue(wo.dueDate) : ""}
@@ -243,7 +242,7 @@ export default async function WorkOrderDetailPage({
 
       {wo.description && (
         <div className="flex flex-col gap-2">
-          <SectionLabel>Description</SectionLabel>
+          <SectionLabel>{t.workOrders.descriptionLabel}</SectionLabel>
           <p className="whitespace-pre-wrap text-[15px] text-slate-700">
             {wo.description}
           </p>
@@ -256,7 +255,7 @@ export default async function WorkOrderDetailPage({
           <input type="hidden" name="workOrderId" value={wo.id} />
           <button type="submit" className={buttonClass("primary", true)}>
             <Play className="h-4 w-4" />
-            Start work
+            {t.workOrders.startWork}
           </button>
         </form>
       )}
@@ -264,18 +263,21 @@ export default async function WorkOrderDetailPage({
         <form action={completeWork} className="flex flex-col gap-3">
           <input type="hidden" name="workOrderId" value={wo.id} />
           <div className="flex flex-col gap-1.5">
-            <SectionLabel>Completion note (optional)</SectionLabel>
-            <Input name="completionNote" placeholder="What did you do?" />
+            <SectionLabel>{t.workOrders.completionNoteLabel}</SectionLabel>
+            <Input
+              name="completionNote"
+              placeholder={t.workOrders.completionNotePlaceholder}
+            />
           </div>
           <div className="flex flex-col gap-1.5">
-            <SectionLabel>Time spent (minutes, optional)</SectionLabel>
+            <SectionLabel>{t.workOrders.timeSpentLabel}</SectionLabel>
             <Input
               name="timeSpentMinutes"
               type="number"
               inputMode="numeric"
               min={1}
               step={1}
-              placeholder="e.g. 45"
+              placeholder={t.workOrders.timeSpentPlaceholder}
               className="w-40 font-mono"
             />
           </div>
@@ -286,19 +288,19 @@ export default async function WorkOrderDetailPage({
               icon={<Check className="h-4 w-4" />}
               message={doneWarning}
             >
-              Mark done
+              {t.workOrders.markDone}
             </ConfirmSubmit>
           ) : (
             <button type="submit" className={buttonClass("primary", true)}>
               <Check className="h-4 w-4" />
-              Mark done
+              {t.workOrders.markDone}
             </button>
           )}
         </form>
       )}
       {wo.status === "done" && (wo.completionNote || wo.timeSpentMinutes != null) && (
         <div className="flex flex-col gap-2">
-          <SectionLabel>Completion</SectionLabel>
+          <SectionLabel>{t.workOrders.completionLabel}</SectionLabel>
           {wo.completionNote && (
             <p className="whitespace-pre-wrap text-[15px] text-slate-700">
               {wo.completionNote}
@@ -306,7 +308,9 @@ export default async function WorkOrderDetailPage({
           )}
           {wo.timeSpentMinutes != null && (
             <p className="text-[14px] text-slate-500">
-              Time spent: <Mono className="text-slate-700">{wo.timeSpentMinutes}</Mono> min
+              {t.workOrders.timeSpentValue}{" "}
+              <Mono className="text-slate-700">{wo.timeSpentMinutes}</Mono>{" "}
+              {t.workOrders.minUnit}
             </p>
           )}
         </div>
@@ -320,18 +324,16 @@ export default async function WorkOrderDetailPage({
           workOrderId={wo.id}
           machineId={wo.machineId}
           machineCode={wo.machineCode}
-          downLabel={`for ${downtimeSince(downtime.startedAt, locale)}`}
+          downLabel={downtimeSince(downtime.startedAt, locale)}
         />
       )}
       {resolvedDowntime && resolvedDowntime.durationMs != null && (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-[14px] text-slate-600">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-green-700" />
-          <span>
-            Ended the machine&rsquo;s downtime —{" "}
-            <span className="text-slate-900">
-              was down {formatDuration(resolvedDowntime.durationMs, locale)}
-            </span>
-            .
+          <span className="text-slate-900">
+            {t.workOrders.downtimeEnded(
+              formatDuration(resolvedDowntime.durationMs, locale),
+            )}
           </span>
         </div>
       )}
@@ -341,7 +343,7 @@ export default async function WorkOrderDetailPage({
       {(checklist.length > 0 || canManageChecklist) && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <SectionLabel>Checklist</SectionLabel>
+            <SectionLabel>{t.workOrders.checklistLabel}</SectionLabel>
             {checklist.length > 0 && (
               <Mono className="text-[13px] text-slate-500">
                 {checkedCount}/{checklist.length}
@@ -362,21 +364,21 @@ export default async function WorkOrderDetailPage({
       {(jobParts.length > 0 || canLog) && (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <SectionLabel>Parts used</SectionLabel>
+            <SectionLabel>{t.workOrders.partsUsedLabel}</SectionLabel>
             {canLog && (
               <Link
                 href={`/work-orders/${wo.id}/parts/new`}
                 className="inline-flex min-h-[44px] items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Add part
+                {t.workOrders.addPart}
               </Link>
             )}
           </div>
           {jobParts.length === 0 ? (
             <EmptyState
               icon={<Package className="h-6 w-6" />}
-              title="No parts logged on this job yet."
+              title={t.workOrders.noPartsLogged}
               action={
                 canLog ? (
                   <Link
@@ -384,7 +386,7 @@ export default async function WorkOrderDetailPage({
                     className={buttonClass("secondary")}
                   >
                     <Plus className="h-4 w-4" />
-                    Add part
+                    {t.workOrders.addPart}
                   </Link>
                 ) : undefined
               }
@@ -417,9 +419,12 @@ export default async function WorkOrderDetailPage({
                       <input type="hidden" name="workOrderId" value={wo.id} />
                       <ConfirmSubmit
                         compact
-                        label={`Remove ${p.name}`}
+                        label={t.workOrders.removePartLabel(p.name)}
                         icon={<Trash2 className="h-4 w-4" />}
-                        message={`Remove ${p.quantity} × ${p.name}? This puts the stock back.`}
+                        message={t.workOrders.removePartConfirm(
+                          p.quantity,
+                          p.name,
+                        )}
                       />
                     </form>
                   )}
@@ -428,11 +433,11 @@ export default async function WorkOrderDetailPage({
               {totalCost != null && (
                 <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-2.5 text-[14px]">
                   <span className="text-slate-600">
-                    Parts cost
+                    {t.workOrders.partsCost}
                     {uncostedCount > 0 && (
                       <span className="text-slate-500">
                         {" · "}
-                        {uncostedCount} without a listed cost
+                        {t.workOrders.withoutCost(uncostedCount)}
                       </span>
                     )}
                   </span>
@@ -454,7 +459,7 @@ export default async function WorkOrderDetailPage({
           hidden when photo storage isn't configured (e.g. no Blob store). */}
       {(jobPhotos.length > 0 || (canLog && photosEnabled())) && (
         <div className="flex flex-col gap-3">
-          <SectionLabel>Photos</SectionLabel>
+          <SectionLabel>{t.workOrders.photosLabel}</SectionLabel>
           <JobPhotos
             workOrderId={wo.id}
             photos={jobPhotos}
@@ -466,7 +471,7 @@ export default async function WorkOrderDetailPage({
 
       {/* Activity */}
       <div className="flex flex-col gap-3">
-        <SectionLabel>Activity</SectionLabel>
+        <SectionLabel>{t.workOrders.activityLabel}</SectionLabel>
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
           {history.map((h) => (
             <div
@@ -474,15 +479,15 @@ export default async function WorkOrderDetailPage({
               className="flex items-start justify-between gap-3 border-b border-slate-100 px-4 py-2.5 text-[14px] last:border-b-0"
             >
               <div className="min-w-0">
-                <span className="capitalize text-slate-700">
-                  {h.toStatus.replace("_", " ")}
+                <span className="text-slate-700">
+                  {historyStatusLabel(h.toStatus, t)}
                   {h.actorName && (
                     <span className="text-slate-500"> · {h.actorName}</span>
                   )}
                 </span>
                 {h.note && (
                   <p className="mt-0.5 whitespace-pre-wrap text-[13px] text-slate-500">
-                    {h.note}
+                    {translateSystemNote(h.note, t)}
                   </p>
                 )}
               </div>

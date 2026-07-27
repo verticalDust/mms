@@ -27,19 +27,19 @@ import {
   REPORT_DAILY_WINDOW_MS,
   REPORT_DAILY_MAX,
 } from "@/lib/reports";
-import { LANG_COOKIE } from "@/lib/i18n/config";
-import { messages, pickLang, type Lang } from "./messages";
+import { LANG_COOKIE, pickLocale, type Locale } from "@/lib/i18n/config";
+import { getMessages } from "@/lib/i18n/messages";
 
 export type SubmitState = { error?: string };
 
 const YEAR = 365 * 24 * 60 * 60; // seconds
 const RECENT_MAX_AGE = 14 * 24 * 60 * 60; // 14 days
 
-async function rememberLang(lang: Lang): Promise<void> {
+async function rememberLang(locale: Locale): Promise<void> {
   const jar = await cookies();
   // Not httpOnly: the form's instant toggle also writes this so the choice
   // carries to the confirmation / re-scan without a round-trip.
-  jar.set(LANG_COOKIE, lang, {
+  jar.set(LANG_COOKIE, locale, {
     httpOnly: false,
     sameSite: "lax",
     path: "/",
@@ -52,8 +52,8 @@ export async function submitReport(
   formData: FormData,
 ): Promise<SubmitState> {
   const code = String(formData.get("code") ?? "");
-  const lang = pickLang(String(formData.get("lang") ?? ""));
-  const t = messages[lang];
+  const locale = pickLocale(String(formData.get("lang") ?? ""));
+  const t = getMessages(locale).public;
 
   const machine = await getMachineByCode(code);
   // A dead or retired label can't take a report — bounce to the friendly page
@@ -61,7 +61,7 @@ export async function submitReport(
   // tab or a direct POST could still land here.
   if (!machine || machine.retiredAt) redirect(`/m/${encodeURIComponent(code)}`);
 
-  await rememberLang(lang);
+  await rememberLang(locale);
 
   // Honeypot: a hidden field no human fills. If it's set, this is a bot — take
   // the SAME confirmation path but store nothing, so the bot learns nothing.

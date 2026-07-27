@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
 import { attachPart, type FormState } from "../../../actions";
 
 export function AttachPartForm({
@@ -13,14 +14,15 @@ export function AttachPartForm({
   partId: number;
 }) {
   const [state, action] = useActionState<FormState, FormData>(attachPart, {});
+  const t = useT();
   return (
     <form action={action} className="flex flex-col gap-4">
       <input type="hidden" name="machineId" value={machineId} />
       <input type="hidden" name="partId" value={partId} />
       <Field
-        label="Quantity"
+        label={t.machines.quantityField}
         htmlFor="quantity"
-        hint="How many this machine uses. Optional."
+        hint={t.machines.quantityHintMachine}
       >
         <Input
           id="quantity"
@@ -33,15 +35,19 @@ export function AttachPartForm({
           className="font-mono"
         />
       </Field>
-      <Field label="Note" htmlFor="note" hint="e.g. position. Optional.">
-        <Input id="note" name="note" placeholder="e.g. front bearing" />
+      <Field
+        label={t.machines.noteField}
+        htmlFor="note"
+        hint={t.machines.noteHint}
+      >
+        <Input id="note" name="note" placeholder={t.machines.notePlaceholder} />
       </Field>
       {state.error && (
         <p role="alert" className="text-[13px] text-red-600">
           {state.error}
         </p>
       )}
-      <SubmitButton>Attach part</SubmitButton>
+      <SubmitButton>{t.machines.attachPart}</SubmitButton>
     </form>
   );
 }

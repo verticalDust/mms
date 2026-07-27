@@ -2,11 +2,15 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { CircleCheck, Factory, RotateCcw } from "lucide-react";
 import { getMachineByCode } from "@/lib/queries";
-import { LANG_COOKIE } from "@/lib/i18n/config";
-import { PublicLangToggle } from "@/components/public-lang-toggle";
-import { messages, pickLang } from "../messages";
+import { LANG_COOKIE, pickLocale } from "@/lib/i18n/config";
+import { getMessages } from "@/lib/i18n/messages";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
+import { LangSwitcher } from "@/components/lang-switcher";
 
-export const metadata = { title: "Reported · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.reported };
+}
 
 // Report confirmation (§7.2) — one calm screen that closes the loop. No account
 // nudge, no internal data; just reassurance and a way to report another fault.
@@ -18,14 +22,14 @@ export default async function ThanksPage({
   const { code } = await params;
   const machine = await getMachineByCode(code);
   const jar = await cookies();
-  const lang = pickLang(jar.get(LANG_COOKIE)?.value);
-  const t = messages[lang];
+  const locale = pickLocale(jar.get(LANG_COOKIE)?.value);
+  const t = getMessages(locale).public;
 
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-slate-50 px-5 py-10">
       <div className="w-full max-w-sm">
         <div className="mb-3 flex justify-end">
-          <PublicLangToggle lang={lang} />
+          <LangSwitcher mode="cookie" />
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50 text-green-600">

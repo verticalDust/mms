@@ -11,9 +11,12 @@ import { buttonClass, Mono, EmptyState } from "@/components/ui";
 import { MachineStatusChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
 import { downtimeSince } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 
-export const metadata = { title: "Machines · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.machines };
+}
 
 const STATUS_VALUES: MachineStatusFilter[] = ["running", "down", "retired"];
 
@@ -31,6 +34,7 @@ export default async function MachinesPage({
 }) {
   const user = await requireUser();
   const locale = await getLocale();
+  const t = await getT();
   const sp = await searchParams;
 
   const q = typeof sp.q === "string" ? sp.q : "";
@@ -55,7 +59,7 @@ export default async function MachinesPage({
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          Machines
+          {t.nav.machines}
         </h1>
         {/* On the true-empty state the empty-state CTA is the sole primary, so
             the header actions step aside (one orange primary per screen). */}
@@ -63,30 +67,30 @@ export default async function MachinesPage({
           <div className="flex items-center gap-2">
             <Link href="/print/labels" className={buttonClass("secondary")}>
               <Printer className="h-4 w-4" />
-              <span className="hidden sm:inline">Print labels</span>
+              <span className="hidden sm:inline">{t.machines.printLabels}</span>
             </Link>
             <Link href="/machines/new" className={buttonClass("primary")}>
               <Plus className="h-4 w-4" />
-              Add machine
+              {t.machines.addMachine}
             </Link>
           </div>
         )}
       </div>
 
       <SearchFilterBar
-        placeholder="Search code, name or location…"
+        placeholder={t.machines.searchPlaceholder}
         chips={[
           {
             param: "status",
             options: [
-              { value: "running", label: "Running" },
-              { value: "down", label: "Down" },
-              { value: "retired", label: "Retired" },
+              { value: "running", label: t.status.machine.running },
+              { value: "down", label: t.status.machine.down },
+              { value: "retired", label: t.status.machine.retired },
             ],
           },
           {
             param: "pm",
-            options: [{ value: "none", label: "No PM" }],
+            options: [{ value: "none", label: t.machines.noPmChip }],
           },
         ]}
         selects={
@@ -94,7 +98,7 @@ export default async function MachinesPage({
             ? [
                 {
                   param: "location",
-                  allLabel: "All locations",
+                  allLabel: t.machines.allLocations,
                   options: locations.map((l) => ({ value: l, label: l })),
                 },
               ]
@@ -106,22 +110,22 @@ export default async function MachinesPage({
         filtered ? (
           <EmptyState
             icon={<SearchX className="h-6 w-6" />}
-            title="No machines match these filters."
+            title={t.machines.emptyNoMatch}
             action={
               <Link href="/machines" className={buttonClass("secondary")}>
-                Clear filters
+                {t.common.clearFiltersAction}
               </Link>
             }
           />
         ) : (
           <EmptyState
             icon={<Factory className="h-6 w-6" />}
-            title="No machines yet."
+            title={t.machines.emptyNone}
             action={
               user.role === "admin" ? (
                 <Link href="/machines/new" className={buttonClass("primary")}>
                   <Plus className="h-4 w-4" />
-                  Add machine
+                  {t.machines.addMachine}
                 </Link>
               ) : undefined
             }

@@ -4,43 +4,44 @@ import { useRef, useState } from "react";
 import { Camera, Loader2, Send, Trash2, Languages } from "lucide-react";
 import { buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
-import {
-  messages,
-  LANG_LABEL,
-  OTHER_LANG,
-  type Lang,
-} from "./messages";
 import { REPORT_DESC_MAX, REPORT_NAME_MAX } from "@/lib/reports";
-import { LANG_COOKIE } from "@/lib/i18n/config";
+import {
+  LANG_COOKIE,
+  LOCALE_LABEL,
+  OTHER_LOCALE,
+  type Locale,
+} from "@/lib/i18n/config";
+import { getMessages } from "@/lib/i18n/messages";
 import { submitReport } from "./actions";
 
 export function ReportForm({
   code,
   machineCode,
   machineName,
-  defaultLang,
+  defaultLocale,
   photosEnabled,
 }: {
   code: string;
   machineCode: string;
   machineName: string;
-  defaultLang: Lang;
+  defaultLocale: Locale;
   photosEnabled: boolean;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const [lang, setLang] = useState<Lang>(defaultLang);
+  const [locale, setLocale] = useState<Locale>(defaultLocale);
   const [photo, setPhoto] = useState<{ blob: Blob; url: string } | null>(null);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const t = messages[lang];
+  const m = getMessages(locale);
+  const t = m.public;
 
   // Instant toggle — no reload, so a half-typed description survives. Also writes
   // the cookie so the confirmation / re-scan inherit the choice.
   function toggleLang() {
-    const next = OTHER_LANG[lang];
-    setLang(next);
+    const next = OTHER_LOCALE[locale];
+    setLocale(next);
     document.cookie = `${LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
   }
 
@@ -71,7 +72,7 @@ export function ReportForm({
     if (!form) return;
 
     const fd = new FormData(form);
-    fd.set("lang", lang);
+    fd.set("lang", locale);
     // Send the client-downscaled, EXIF-stripped blob — never the raw camera file.
     fd.delete("photo");
     if (photo) fd.set("photo", photo.blob, "photo.jpg");
@@ -106,7 +107,7 @@ export function ReportForm({
       className="flex w-full max-w-sm flex-col gap-5"
     >
       <input type="hidden" name="code" value={code} />
-      <input type="hidden" name="lang" value={lang} />
+      <input type="hidden" name="lang" value={locale} />
 
       {/* Machine identity (from the scanned QR) + language toggle */}
       <div className="flex items-start justify-between gap-3">
@@ -122,11 +123,11 @@ export function ReportForm({
         <button
           type="button"
           onClick={toggleLang}
-          aria-label="Switch language"
+          aria-label={m.common.switchLanguage}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 font-condensed text-[13px] font-medium tracking-wide text-slate-600 hover:bg-slate-50 cursor-pointer"
         >
           <Languages className="h-4 w-4" />
-          {LANG_LABEL[OTHER_LANG[lang]]}
+          {LOCALE_LABEL[OTHER_LOCALE[locale]]}
         </button>
       </div>
 

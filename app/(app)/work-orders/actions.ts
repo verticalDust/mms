@@ -21,15 +21,19 @@ import {
   issuePartToWorkOrder,
   reverseWorkOrderPart,
   StockError,
-  insufficientMessage,
+  stockErrorMessage,
 } from "@/lib/stock";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/messages";
 import { advanceScheduleAfterCompletion } from "@/lib/pm";
 
 // `ok` lets a client editor (the plan editor) tell success from the initial
 // blank state so it can collapse itself once the save lands.
 export type FormState = { error?: string; ok?: boolean };
 
+// STORED token map — the reprioritize audit note is persisted in English and
+// translated at display time via lib/i18n/system-notes. Do NOT localize this.
 const PRIORITY_LABEL: Record<string, string> = {
   low: "Low",
   medium: "Medium",
@@ -37,17 +41,18 @@ const PRIORITY_LABEL: Record<string, string> = {
   critical: "Critical",
 };
 
-const createSchema = z.object({
-  title: z.string().trim().min(1, "Title is required."),
-  machineId: z.coerce.number().int().positive("Pick a machine."),
-  priority: z.enum(["low", "medium", "high", "critical"]),
-  assigneeId: z.coerce.number().int().positive().optional(),
-  dueDate: z.string().trim().optional(),
-  description: z.string().trim().optional(),
-  // Set when triaging a report into a job (E5-S2): links the job and marks the
-  // report handled. The machine then comes from the report, not the form.
-  reportId: z.coerce.number().int().positive().optional(),
-});
+const createSchema = (t: Messages) =>
+  z.object({
+    title: z.string().trim().min(1, t.workOrders.errTitleRequired),
+    machineId: z.coerce.number().int().positive(t.workOrders.errPickMachine),
+    priority: z.enum(["low", "medium", "high", "critical"]),
+    assigneeId: z.coerce.number().int().positive().optional(),
+    dueDate: z.string().trim().optional(),
+    description: z.string().trim().optional(),
+    // Set when triaging a report into a job (E5-S2): links the job and marks the
+    // report handled. The machine then comes from the report, not the form.
+    reportId: z.coerce.number().int().positive().optional(),
+  });
 
 async function logStatus(
   workOrderId: number,
@@ -70,14 +75,15 @@ export async function createWorkOrder(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "work:create");
   } catch {
-    return { error: "Only an admin can create work orders." };
+    return { error: t.workOrders.errOnlyAdminCreate };
   }
 
-  const parsed = createSchema.safeParse({
+  const parsed = createSchema(t).safeParse({
     title: formData.get("title"),
     machineId: formData.get("machineId"),
     priority: formData.get("priority") || "medium",
@@ -87,7 +93,7 @@ export async function createWorkOrder(
     reportId: formData.get("reportId") || undefined,
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
 
   // Triage path: the report must still be untriaged, and it — not the form —
@@ -103,9 +109,9 @@ export async function createWorkOrder(
       .from(reports)
       .where(eq(reports.id, parsed.data.reportId))
       .limit(1);
-    if (!rep) return { error: "That report no longer exists." };
+    if (!rep) return { error: t.workOrders.errReportGone };
     if (rep.status !== "new")
-      return { error: "That report has already been handled." };
+      return { error: t.workOrders.errReportHandled };
     report = { id: rep.id, machineId: rep.machineId };
   }
 
@@ -115,9 +121,9 @@ export async function createWorkOrder(
     .from(machines)
     .where(eq(machines.id, machineId))
     .limit(1);
-  if (!machine) return { error: "That machine no longer exists." };
+  if (!machine) return { error: t.common.machineGone };
   if (machine.retiredAt)
-    return { error: "That machine is retired. You can't open work on it." };
+    return { error: t.workOrders.errMachineRetiredWork };
 
   // Due dates are day-granular. "T00:00:00" (no zone) stores SERVER-local
   // midnight; reads bucket in the factory timezone (lib/format). These agree for
@@ -174,8 +180,8 @@ export async function createWorkOrder(
     });
   } catch (e) {
     if (e instanceof Error && e.message === "REPORT_TAKEN")
-      return { error: "That report has already been handled." };
-    if (isBusy(e)) return { error: "The queue is busy. Try again." };
+      return { error: t.workOrders.errReportHandled };
+    if (isBusy(e)) return { error: t.workOrders.errQueueBusy };
     throw e;
   }
 
@@ -278,11 +284,12 @@ export async function updateWorkOrderPlan(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "work:reassign");
   } catch {
-    return { error: "Only a planner can reassign or reschedule a job." };
+    return { error: t.workOrders.errOnlyPlannerReassign };
   }
 
   const parsed = updatePlanSchema.safeParse({
@@ -292,7 +299,7 @@ export async function updateWorkOrderPlan(
     priority: formData.get("priority"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
   const { workOrderId, priority } = parsed.data;
   const newAssigneeId = parsed.data.assigneeId ?? null;
@@ -302,7 +309,7 @@ export async function updateWorkOrderPlan(
   let newDue: Date | null = null;
   if (rawDue) {
     const d = new Date(rawDue + "T00:00:00");
-    if (isNaN(d.getTime())) return { error: "That due date isn't valid." };
+    if (isNaN(d.getTime())) return { error: t.workOrders.errDueInvalid };
     newDue = d;
   }
 
@@ -317,10 +324,10 @@ export async function updateWorkOrderPlan(
     .from(workOrders)
     .where(eq(workOrders.id, workOrderId))
     .limit(1);
-  if (!wo) return { error: "That work order no longer exists." };
+  if (!wo) return { error: t.workOrders.errWorkOrderGone };
   // A closed job's plan is locked — its assignee and dates are history now.
   if (wo.status === "done" || wo.status === "cancelled")
-    return { error: "This job is closed. Its plan can't be changed." };
+    return { error: t.workOrders.errJobClosedPlan };
 
   // Names for the audit trail (an old assignee may be inactive — still name it).
   const oldName = await userName(wo.assigneeId);
@@ -337,7 +344,7 @@ export async function updateWorkOrderPlan(
       .from(users)
       .where(eq(users.id, newAssigneeId))
       .limit(1);
-    if (!u || !u.active) return { error: "Pick an active person to assign." };
+    if (!u || !u.active) return { error: t.workOrders.errPickActive };
     newName = u.name;
   }
 
@@ -391,7 +398,7 @@ export async function updateWorkOrderPlan(
     });
   } catch (e) {
     // Rare write contention — the tx rolled back cleanly, so retry beats a 500.
-    if (isBusy(e)) return { error: "The job is busy. Try again." };
+    if (isBusy(e)) return { error: t.workOrders.errJobBusy };
     throw e;
   }
 
@@ -417,33 +424,35 @@ async function userName(id: number | null): Promise<string> {
 // Authoring (add/remove steps) is a planner action; ticking is daily work any
 // signed-in user does as they work the job. Both are locked once the job closes.
 
-const addChecklistSchema = z.object({
-  workOrderId: z.coerce.number().int().positive(),
-  text: z
-    .string()
-    .trim()
-    .min(1, "Enter a step.")
-    .max(200, "Keep a step under 200 characters."),
-});
+const addChecklistSchema = (t: Messages) =>
+  z.object({
+    workOrderId: z.coerce.number().int().positive(),
+    text: z
+      .string()
+      .trim()
+      .min(1, t.workOrders.errStepRequired)
+      .max(200, t.workOrders.errStepTooLong),
+  });
 
 export async function addChecklistItem(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "work:manage-checklist");
   } catch {
-    return { error: "Only a planner can edit the checklist." };
+    return { error: t.workOrders.errOnlyPlannerChecklist };
   }
 
-  const parsed = addChecklistSchema.safeParse({
+  const parsed = addChecklistSchema(t).safeParse({
     workOrderId: formData.get("workOrderId"),
     text: formData.get("text"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the step." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
   const { workOrderId, text } = parsed.data;
 
@@ -452,9 +461,9 @@ export async function addChecklistItem(
     .from(workOrders)
     .where(eq(workOrders.id, workOrderId))
     .limit(1);
-  if (!wo) return { error: "That work order no longer exists." };
+  if (!wo) return { error: t.workOrders.errWorkOrderGone };
   if (wo.status === "done" || wo.status === "cancelled")
-    return { error: "This job is closed. Its checklist is locked." };
+    return { error: t.workOrders.errJobClosedChecklist };
 
   // Append after the current last step.
   const [{ maxPos }] = await db
@@ -607,31 +616,33 @@ export async function resolveDowntimeForJob(formData: FormData): Promise<void> {
 
 // ── Parts used on a job (E3-S6) ──────────────────────────────────────────────
 
-const addPartSchema = z.object({
-  workOrderId: z.coerce.number().int().positive(),
-  partId: z.coerce.number().int().positive("Pick a part."),
-  quantity: z.coerce.number().int().min(1, "Enter a quantity of 1 or more."),
-});
+const addPartSchema = (t: Messages) =>
+  z.object({
+    workOrderId: z.coerce.number().int().positive(),
+    partId: z.coerce.number().int().positive(t.workOrders.errPickPart),
+    quantity: z.coerce.number().int().min(1, t.workOrders.errQtyMin),
+  });
 
 export async function addPartToJob(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "work:log-parts");
   } catch {
-    return { error: "You don't have permission to log parts." };
+    return { error: t.workOrders.errNoPermLogParts };
   }
 
-  const parsed = addPartSchema.safeParse({
+  const parsed = addPartSchema(t).safeParse({
     workOrderId: formData.get("workOrderId"),
     partId: formData.get("partId"),
     quantity: formData.get("quantity"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
   const { workOrderId, partId, quantity } = parsed.data;
 
@@ -640,20 +651,16 @@ export async function addPartToJob(
     .from(workOrders)
     .where(eq(workOrders.id, workOrderId))
     .limit(1);
-  if (!wo) return { error: "That work order no longer exists." };
+  if (!wo) return { error: t.workOrders.errWorkOrderGone };
   if (wo.status === "done" || wo.status === "cancelled")
-    return { error: "This job is closed. Parts can only be logged on an open job." };
+    return { error: t.workOrders.errJobClosedParts };
 
   try {
     await issuePartToWorkOrder({ workOrderId, partId, quantity, actorId: user.id });
   } catch (e) {
-    if (e instanceof StockError) {
-      if (e.code === "INSUFFICIENT") return { error: insufficientMessage(e) };
-      if (e.code === "NOT_FOUND") return { error: "That part no longer exists." };
-      return { error: e.message };
-    }
+    if (e instanceof StockError) return { error: stockErrorMessage(e, t) };
     // Rare write contention — the tx rolled back cleanly, so retry beats a 500.
-    if (isBusy(e)) return { error: "The stock ledger is busy. Try again." };
+    if (isBusy(e)) return { error: t.workOrders.errLedgerBusy };
     throw e;
   }
 

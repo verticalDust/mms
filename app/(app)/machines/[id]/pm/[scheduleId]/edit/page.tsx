@@ -9,9 +9,13 @@ import { getPmSchedule } from "@/lib/queries";
 import { parseChecklistTemplate } from "@/lib/pm";
 import { toDateInputValue } from "@/lib/format";
 import { Mono } from "@/components/ui";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { PmScheduleForm } from "../../pm-schedule-form";
 
-export const metadata = { title: "Edit PM schedule · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.editPmSchedule };
+}
 
 export default async function EditPmSchedulePage({
   params,
@@ -19,6 +23,7 @@ export default async function EditPmSchedulePage({
   params: Promise<{ id: string; scheduleId: string }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const { id, scheduleId } = await params;
   const machineId = Number(id);
   const sId = Number(scheduleId);
@@ -51,7 +56,7 @@ export default async function EditPmSchedulePage({
       </Link>
       <div>
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          Edit PM schedule
+          {t.machines.editPmScheduleTitle}
         </h1>
         <p className="mt-0.5 text-[14px] text-slate-500">
           <Mono>{machine.code}</Mono> · {machine.name}

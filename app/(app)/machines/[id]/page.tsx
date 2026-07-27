@@ -48,7 +48,7 @@ import {
   factoryStartOfDay,
   dueState,
 } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
 import { getSettings } from "@/lib/setup";
 import { qrSvg } from "@/lib/qr";
 import { appBaseUrl, machineScanPath } from "@/lib/url";
@@ -69,6 +69,7 @@ export default async function MachineDetailPage({
 }) {
   const user = await requireUser();
   const locale = await getLocale();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -151,14 +152,13 @@ export default async function MachineDetailPage({
         className="inline-flex items-center gap-1.5 text-[14px] text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft className="h-4 w-4" />
-        Machines
+        {t.nav.machines}
       </Link>
 
       {retired && (
         <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[14px] text-slate-600">
           <Ban className="h-4 w-4 shrink-0" />
-          This machine is retired. Its history stays, and it won&rsquo;t take new
-          work.
+          {t.machines.retiredBanner}
         </div>
       )}
 
@@ -193,11 +193,11 @@ export default async function MachineDetailPage({
             <QrImage
               svg={svg}
               className="h-24 w-24"
-              label={`QR code linking to machine ${machine.code}`}
+              label={t.machines.qrCodeLabel(machine.code)}
             />
             <div className="flex flex-col">
               <span className="font-condensed text-[12px] tracking-wide text-slate-500">
-                Scan to report
+                {t.machines.scanToReport}
               </span>
               <Mono className="text-[13px] text-slate-700">{machine.code}</Mono>
               {isAdmin && !retired && (
@@ -206,7 +206,7 @@ export default async function MachineDetailPage({
                   className="mt-2 inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  Print label
+                  {t.machines.printLabel}
                 </Link>
               )}
             </div>
@@ -221,7 +221,7 @@ export default async function MachineDetailPage({
                 <input type="hidden" name="machineId" value={machine.id} />
                 <button type="submit" className={buttonClass("primary")}>
                   <CircleDot className="h-4 w-4" />
-                  Mark running
+                  {t.machines.markRunning}
                 </button>
               </form>
             ) : (
@@ -229,7 +229,7 @@ export default async function MachineDetailPage({
                 <input type="hidden" name="machineId" value={machine.id} />
                 <button type="submit" className={buttonClass("danger")}>
                   <OctagonX className="h-4 w-4" />
-                  Mark down
+                  {t.machines.markDown}
                 </button>
               </form>
             ))}
@@ -240,7 +240,7 @@ export default async function MachineDetailPage({
               className={buttonClass("secondary")}
             >
               <Pencil className="h-4 w-4" />
-              Edit
+              {t.common.edit}
             </Link>
           )}
 
@@ -251,9 +251,9 @@ export default async function MachineDetailPage({
                 <ConfirmSubmit
                   variant="secondary"
                   icon={<Undo2 className="h-4 w-4" />}
-                  message="Bring this machine back into service?"
+                  message={t.machines.returnConfirm}
                 >
-                  Return to service
+                  {t.machines.returnToService}
                 </ConfirmSubmit>
               </form>
             ) : (
@@ -262,9 +262,9 @@ export default async function MachineDetailPage({
                 <ConfirmSubmit
                   variant="secondary"
                   icon={<Ban className="h-4 w-4" />}
-                  message="Retire this machine? It leaves the active lists and stops taking new work. Its history is kept, and you can return it to service later."
+                  message={t.machines.retireConfirm}
                 >
-                  Retire
+                  {t.machines.retire}
                 </ConfirmSubmit>
               </form>
             ))}
@@ -273,7 +273,7 @@ export default async function MachineDetailPage({
 
       {machine.notes && (
         <div className="flex flex-col gap-2">
-          <SectionLabel>Notes</SectionLabel>
+          <SectionLabel>{t.machines.notesLabel}</SectionLabel>
           <p className="whitespace-pre-wrap text-[15px] text-slate-700">
             {machine.notes}
           </p>
@@ -283,20 +283,20 @@ export default async function MachineDetailPage({
       {/* Parts (fitment — E2-S8/S9) */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <SectionLabel>Parts</SectionLabel>
+          <SectionLabel>{t.nav.parts}</SectionLabel>
           {isAdmin && !retired && (
             <Link
               href={`/machines/${machine.id}/parts/new`}
               className="inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add part
+              {t.workOrders.addPart}
             </Link>
           )}
         </div>
         {attachedParts.length === 0 ? (
           <EmptyState
-            title="No parts recorded for this machine yet."
+            title={t.machines.noPartsMachine}
             action={
               isAdmin && !retired ? (
                 <Link
@@ -304,7 +304,7 @@ export default async function MachineDetailPage({
                   className={buttonClass("secondary")}
                 >
                   <Plus className="h-4 w-4" />
-                  Add part
+                  {t.workOrders.addPart}
                 </Link>
               ) : undefined
             }
@@ -331,13 +331,13 @@ export default async function MachineDetailPage({
                       <div className="truncate text-[13px] text-slate-500">
                         {p.binLocation && (
                           <>
-                            bin <Mono>{p.binLocation}</Mono>
+                            {t.parts.bin} <Mono>{p.binLocation}</Mono>
                           </>
                         )}
                         {p.quantity != null && (
                           <>
-                            {p.binLocation ? " · " : ""}qty{" "}
-                            <Mono>{p.quantity}</Mono>
+                            {p.binLocation ? " · " : ""}
+                            {t.machines.qty} <Mono>{p.quantity}</Mono>
                           </>
                         )}
                         {p.note && (
@@ -359,9 +359,9 @@ export default async function MachineDetailPage({
                     <input type="hidden" name="partId" value={p.partId} />
                     <ConfirmSubmit
                       compact
-                      label={`Remove ${p.sku}`}
+                      label={t.machines.removePartLabel(p.sku)}
                       icon={<Trash2 className="h-4 w-4" />}
-                      message={`Remove ${p.sku} from this machine? This removes only the link. The part and its stock history stay.`}
+                      message={t.machines.removePartConfirm(p.sku)}
                     />
                   </form>
                 )}
@@ -374,19 +374,19 @@ export default async function MachineDetailPage({
       {/* Open work */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <SectionLabel>Open work orders</SectionLabel>
+          <SectionLabel>{t.machines.openWork}</SectionLabel>
           {!retired && (
             <Link
               href={`/work-orders/new?machine=${machine.id}`}
               className="inline-flex items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
             >
               <Plus className="h-3.5 w-3.5" />
-              New
+              {t.workOrders.newShort}
             </Link>
           )}
         </div>
         {openJobs.length === 0 ? (
-          <EmptyState title="No open work orders on this machine." />
+          <EmptyState title={t.machines.noOpenWork} />
         ) : (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {openJobs.map((wo) => (
@@ -412,18 +412,15 @@ export default async function MachineDetailPage({
       {/* Completed work */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <SectionLabel>Completed work</SectionLabel>
+          <SectionLabel>{t.machines.completedWork}</SectionLabel>
           {laborMinutes > 0 && (
             <span className="text-[13px] text-slate-500">
-              <Mono className="text-slate-600">
-                {formatDuration(laborMinutes * 60000, locale)}
-              </Mono>{" "}
-              logged
+              {t.machines.logged(formatDuration(laborMinutes * 60000, locale))}
             </span>
           )}
         </div>
         {doneJobs.length === 0 ? (
-          <EmptyState title="No completed work orders yet." />
+          <EmptyState title={t.machines.noCompletedWork} />
         ) : (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {doneJobs.map((wo) => {
@@ -443,7 +440,7 @@ export default async function MachineDetailPage({
                     </div>
                     <div className="truncate text-[13px] text-slate-500">
                       {wo.completedAt ? formatDate(wo.completedAt, locale) : "—"}
-                      {n > 0 && ` · ${n} part${n === 1 ? "" : "s"} used`}
+                      {n > 0 && ` · ${t.machines.partsUsed(n)}`}
                     </div>
                   </div>
                   <WorkStatusChip status="done" />
@@ -457,20 +454,20 @@ export default async function MachineDetailPage({
       {/* Preventive maintenance (E4) */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <SectionLabel>Preventive maintenance</SectionLabel>
+          <SectionLabel>{t.nav.pm}</SectionLabel>
           {isAdmin && !retired && (
             <Link
               href={`/machines/${id}/pm/new`}
               className="inline-flex min-h-[44px] items-center gap-1 text-[13px] text-slate-500 hover:text-slate-700"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add schedule
+              {t.machines.addSchedule}
             </Link>
           )}
         </div>
         {schedules.length === 0 ? (
           <EmptyState
-            title="No preventive maintenance scheduled."
+            title={t.machines.noPmScheduled}
             action={
               isAdmin && !retired ? (
                 <Link
@@ -478,7 +475,7 @@ export default async function MachineDetailPage({
                   className={buttonClass("secondary")}
                 >
                   <Plus className="h-4 w-4" />
-                  Add PM schedule
+                  {t.machines.addPmSchedule}
                 </Link>
               ) : undefined
             }
@@ -498,27 +495,32 @@ export default async function MachineDetailPage({
                       {s.title}
                     </div>
                     <div className="mt-0.5 text-[13px] text-slate-500">
-                      Every {s.intervalDays} days
+                      {t.machines.everyDays(s.intervalDays)}
                       {s.assigneeName ? ` · ${s.assigneeName}` : ""}
-                      {steps > 0 ? ` · ${steps} step${steps === 1 ? "" : "s"}` : ""}
+                      {steps > 0 ? ` · ${t.machines.steps(steps)}` : ""}
                     </div>
                     <div className="mt-1 text-[13px]">
                       {s.paused ? (
                         <span className="inline-flex items-center gap-1 text-slate-500">
-                          <PauseCircle className="h-3.5 w-3.5" /> Paused
+                          <PauseCircle className="h-3.5 w-3.5" /> {t.machines.paused}
                         </span>
                       ) : ds.kind === "overdue" ? (
                         <span className="inline-flex items-center gap-1 text-red-600">
                           <Clock className="h-3.5 w-3.5" />
-                          <Mono>{ds.days}d</Mono> overdue
+                          <Mono>
+                            {ds.days}
+                            {t.common.dayShort}
+                          </Mono>{" "}
+                          {t.pm.overdue}
                         </span>
                       ) : ds.kind === "today" ? (
                         <span className="inline-flex items-center gap-1 text-amber-700">
-                          <Clock className="h-3.5 w-3.5" /> Due today
+                          <Clock className="h-3.5 w-3.5" /> {t.due.today}
                         </span>
                       ) : (
                         <span className="text-slate-500">
-                          Next <Mono>{formatDate(s.nextDueDate, locale)}</Mono>
+                          {t.pm.next}{" "}
+                          <Mono>{formatDate(s.nextDueDate, locale)}</Mono>
                         </span>
                       )}
                     </div>
@@ -536,8 +538,8 @@ export default async function MachineDetailPage({
                           type="submit"
                           aria-label={
                             s.paused
-                              ? `Resume ${s.title}`
-                              : `Pause ${s.title}`
+                              ? t.machines.resumeLabel(s.title)
+                              : t.machines.pauseLabel(s.title)
                           }
                           className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                         >
@@ -550,7 +552,7 @@ export default async function MachineDetailPage({
                       </form>
                       <Link
                         href={`/machines/${id}/pm/${s.id}/edit`}
-                        aria-label={`Edit ${s.title}`}
+                        aria-label={t.machines.editScheduleLabel(s.title)}
                         className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700"
                       >
                         <Pencil className="h-4 w-4" />
@@ -559,9 +561,9 @@ export default async function MachineDetailPage({
                         <input type="hidden" name="scheduleId" value={s.id} />
                         <ConfirmSubmit
                           compact
-                          label={`Delete ${s.title}`}
+                          label={t.machines.deleteScheduleLabel(s.title)}
                           icon={<Trash2 className="h-4 w-4" />}
-                          message={`Delete the "${s.title}" schedule? Jobs it already created stay as history.`}
+                          message={t.machines.deleteScheduleConfirm(s.title)}
                         />
                       </form>
                     </div>
@@ -575,9 +577,9 @@ export default async function MachineDetailPage({
 
       {/* Downtime history */}
       <div className="flex flex-col gap-3">
-        <SectionLabel>Downtime history</SectionLabel>
+        <SectionLabel>{t.machines.downtimeHistory}</SectionLabel>
         {history.length === 0 ? (
-          <EmptyState title="No recorded stoppages." />
+          <EmptyState title={t.machines.noStoppages} />
         ) : (
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
             {history.map((p) => (
@@ -597,7 +599,7 @@ export default async function MachineDetailPage({
                       href={`/work-orders/${p.workOrderId}`}
                       className="text-[13px] text-slate-500 hover:text-slate-700"
                     >
-                      Fixed by <Mono>WO-{p.workOrderId}</Mono>
+                      {t.machines.fixedBy} <Mono>WO-{p.workOrderId}</Mono>
                     </Link>
                   )}
                 </div>
@@ -607,7 +609,9 @@ export default async function MachineDetailPage({
                       {formatDuration(p.durationMs ?? 0, locale)}
                     </Mono>
                   ) : (
-                    <span className="text-[13px] text-red-600">ongoing</span>
+                    <span className="text-[13px] text-red-600">
+                      {t.machines.ongoing}
+                    </span>
                   )}
                 </div>
               </div>

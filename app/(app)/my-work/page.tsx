@@ -5,16 +5,20 @@ import { getSettings } from "@/lib/setup";
 import { searchWorkOrders, uncheckedStepsFor } from "@/lib/queries";
 import { Mono, EmptyState } from "@/components/ui";
 import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { cn } from "@/lib/cn";
 import { startWork, completeWork } from "../work-orders/actions";
 import { JobAction } from "./job-action";
 
-export const metadata = { title: "My work · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.myWork };
+}
 
 export default async function MyWorkPage() {
   const user = await requireUser();
   const locale = await getLocale();
+  const t = await getT();
   // Active jobs assigned to me, overdue-first (same query the queue uses).
   const { rows } = await searchWorkOrders({ assigneeId: user.id });
   // "Overdue" in the factory timezone, matching the dashboard + queue (§1.5).
@@ -27,17 +31,15 @@ export default async function MyWorkPage() {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          My work
+          {t.nav.myWork}
         </h1>
-        <p className="mt-0.5 text-[14px] text-slate-500">
-          Your open jobs, soonest due first.
-        </p>
+        <p className="mt-0.5 text-[14px] text-slate-500">{t.myWork.subtitle}</p>
       </div>
 
       {rows.length === 0 ? (
         <EmptyState
           icon={<Wrench className="h-6 w-6" />}
-          title="No jobs assigned to you. New work lands here when the planner assigns it."
+          title={t.myWork.empty}
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -50,11 +52,7 @@ export default async function MyWorkPage() {
               wo.status === "open" ? [] : uncheckedByJob.get(wo.id) ?? [];
             const doneWarning =
               unticked.length > 0
-                ? `${unticked.length} step${
-                    unticked.length === 1 ? "" : "s"
-                  } not ticked:\n\n${unticked
-                    .map((s) => `• ${s}`)
-                    .join("\n")}\n\nMark the job done anyway?`
+                ? t.workOrders.doneWarning(unticked)
                 : undefined;
             return (
               <div
@@ -80,17 +78,22 @@ export default async function MyWorkPage() {
                       <span className="inline-flex shrink-0 items-center gap-1 text-red-600">
                         <span aria-hidden>·</span>
                         <Clock className="h-3.5 w-3.5" />
-                        <Mono>{ds.days}d</Mono> over
+                        <Mono>
+                          {ds.days}
+                          {t.common.dayShort}
+                        </Mono>{" "}
+                        {t.due.over}
                       </span>
                     ) : ds.kind === "today" ? (
                       <span className="inline-flex shrink-0 items-center gap-1 text-amber-700">
                         <span aria-hidden>·</span>
                         <Clock className="h-3.5 w-3.5" />
-                        Due today
+                        {t.due.today}
                       </span>
                     ) : ds.kind === "future" ? (
                       <span className="shrink-0">
-                        <span aria-hidden>· </span>due{" "}
+                        <span aria-hidden>· </span>
+                        {t.due.duePrefix}{" "}
                         <Mono>{formatDate(ds.date, locale, timeZone)}</Mono>
                       </span>
                     ) : null}
@@ -104,9 +107,11 @@ export default async function MyWorkPage() {
                   <input type="hidden" name="workOrderId" value={wo.id} />
                   <JobAction
                     kind={wo.status === "open" ? "start" : "done"}
-                    label={`${
-                      wo.status === "open" ? "Start" : "Complete"
-                    } WO-${wo.id} — ${wo.title}`}
+                    label={
+                      wo.status === "open"
+                        ? t.myWork.startAria(wo.id, wo.title)
+                        : t.myWork.completeAria(wo.id, wo.title)
+                    }
                     confirmMessage={doneWarning}
                   />
                 </form>

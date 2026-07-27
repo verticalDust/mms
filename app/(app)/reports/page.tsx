@@ -3,14 +3,17 @@ import { Clock, Inbox, ClipboardPlus, User, Ban } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { listNewReports } from "@/lib/queries";
 import { formatDuration } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { Mono, SectionLabel, EmptyState } from "@/components/ui";
 import { ClearChip } from "@/components/status-chip";
 import { buttonClass } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { DismissReport } from "./dismiss-report";
 
-export const metadata = { title: "Triage · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.reports };
+}
 
 // Triage queue (E5-S2) — new reports awaiting a decision, oldest first. Each is
 // turned into a work order (prefilled) or dismissed with a reason. Planner-only;
@@ -18,6 +21,7 @@ export const metadata = { title: "Triage · MMS" };
 export default async function ReportsPage() {
   await requireAdmin();
   const locale = await getLocale();
+  const t = await getT();
   const reports = await listNewReports();
   const now = Date.now();
 
@@ -25,23 +29,23 @@ export default async function ReportsPage() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          Triage
+          {t.reports.title}
         </h1>
         {reports.length === 0 ? (
-          <ClearChip>Inbox clear</ClearChip>
+          <ClearChip>{t.reports.inboxClear}</ClearChip>
         ) : (
           <span className="font-condensed text-[13px] font-medium tracking-wide text-slate-500">
-            {reports.length} waiting
+            {t.reports.waiting(reports.length)}
           </span>
         )}
       </div>
 
-      <SectionLabel>Reported faults · oldest first</SectionLabel>
+      <SectionLabel>{t.reports.reportedFaults}</SectionLabel>
 
       {reports.length === 0 ? (
         <EmptyState
           icon={<Inbox className="h-6 w-6" />}
-          title="No reports waiting. The floor's all quiet."
+          title={t.reports.empty}
         />
       ) : (
         <div className="flex flex-col gap-3">
@@ -78,7 +82,7 @@ export default async function ReportsPage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={`/reports/${r.id}/photo`}
-                      alt="Reported fault"
+                      alt={t.reports.reportedFaultAlt}
                       className="h-16 w-16 rounded-md border border-slate-200 object-cover"
                     />
                   </Link>
@@ -102,7 +106,7 @@ export default async function ReportsPage() {
                   // only be dismissed, so don't offer a dead-end Create action.
                   <span className="inline-flex items-center gap-1.5 text-[13px] text-slate-500">
                     <Ban className="h-4 w-4" />
-                    Machine retired · dismiss only
+                    {t.reports.machineRetiredDismiss}
                   </span>
                 ) : (
                   <Link
@@ -110,7 +114,7 @@ export default async function ReportsPage() {
                     className={cn(buttonClass("primary"))}
                   >
                     <ClipboardPlus className="h-4 w-4" />
-                    Create work order
+                    {t.reports.createWorkOrder}
                   </Link>
                 )}
                 <DismissReport reportId={r.id} />

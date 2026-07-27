@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Field, Input, Textarea, Select } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
 import {
   createPmSchedule,
   updatePmSchedule,
@@ -34,6 +35,7 @@ export function PmScheduleForm({
     editing ? updatePmSchedule : createPmSchedule,
     {},
   );
+  const t = useT();
 
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -43,19 +45,19 @@ export function PmScheduleForm({
         <input type="hidden" name="machineId" value={machineId} />
       )}
 
-      <Field label="Title" htmlFor="title">
+      <Field label={t.pm.titleField} htmlFor="title">
         <Input
           id="title"
           name="title"
           required
           autoFocus
           defaultValue={values?.title}
-          placeholder="e.g. Lubrication"
+          placeholder={t.pm.titlePlaceholder}
         />
       </Field>
 
       <div className="grid grid-cols-2 gap-4">
-        <Field label="Every (days)" htmlFor="intervalDays">
+        <Field label={t.pm.everyDaysField} htmlFor="intervalDays">
           <Input
             id="intervalDays"
             name="intervalDays"
@@ -68,7 +70,7 @@ export function PmScheduleForm({
             className="font-mono"
           />
         </Field>
-        <Field label="First due date" htmlFor="nextDueDate">
+        <Field label={t.pm.firstDueField} htmlFor="nextDueDate">
           <Input
             id="nextDueDate"
             name="nextDueDate"
@@ -79,13 +81,13 @@ export function PmScheduleForm({
         </Field>
       </div>
 
-      <Field label="Default assignee" htmlFor="defaultAssigneeId">
+      <Field label={t.pm.defaultAssignee} htmlFor="defaultAssigneeId">
         <Select
           id="defaultAssigneeId"
           name="defaultAssigneeId"
           defaultValue={values?.defaultAssigneeId ?? ""}
         >
-          <option value="">Unassigned</option>
+          <option value="">{t.workOrders.unassigned}</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
               {u.label}
@@ -95,16 +97,16 @@ export function PmScheduleForm({
       </Field>
 
       <Field
-        label="Checklist template"
+        label={t.pm.checklistTemplate}
         htmlFor="checklist"
-        hint="One step per line. Each generated job starts with these."
+        hint={t.pm.checklistHint}
       >
         <Textarea
           id="checklist"
           name="checklist"
           rows={4}
           defaultValue={values?.checklist}
-          placeholder={"Check oil level\nInspect belts\nTorque mounting bolts"}
+          placeholder={t.pm.checklistPlaceholder}
         />
       </Field>
 
@@ -113,7 +115,9 @@ export function PmScheduleForm({
           {state.error}
         </p>
       )}
-      <SubmitButton>{editing ? "Save schedule" : "Create schedule"}</SubmitButton>
+      <SubmitButton>
+        {editing ? t.pm.saveSchedule : t.pm.createSchedule}
+      </SubmitButton>
     </form>
   );
 }

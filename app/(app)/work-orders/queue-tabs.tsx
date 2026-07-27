@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/cn";
+import { getT } from "@/lib/i18n/server";
 import type { QueueCounts } from "@/lib/queries";
 
 // Status tabs with live counts (E3-S2). These are navigation links, not an ARIA
@@ -8,7 +9,7 @@ import type { QueueCounts } from "@/lib/queries";
 // an in-place panel switch and keyboard model we don't implement). State lives
 // in the URL — shareable, survives refresh, no client JS. Each link carries the
 // other active filters forward; only `status` changes.
-export function QueueTabs({
+export async function QueueTabs({
   active,
   counts,
   baseParams,
@@ -17,12 +18,21 @@ export function QueueTabs({
   counts: QueueCounts;
   baseParams: Record<string, string>;
 }) {
+  const t = await getT();
   const tabs: { value: WorkStatusFilter; label: string; count: number }[] = [
-    { value: null, label: "Active", count: counts.active },
-    { value: "open", label: "Open", count: counts.open },
-    { value: "in_progress", label: "In progress", count: counts.in_progress },
-    { value: "done", label: "Done", count: counts.done },
-    { value: "cancelled", label: "Cancelled", count: counts.cancelled },
+    { value: null, label: t.workOrders.tabs.active, count: counts.active },
+    { value: "open", label: t.workOrders.tabs.open, count: counts.open },
+    {
+      value: "in_progress",
+      label: t.workOrders.tabs.in_progress,
+      count: counts.in_progress,
+    },
+    { value: "done", label: t.workOrders.tabs.done, count: counts.done },
+    {
+      value: "cancelled",
+      label: t.workOrders.tabs.cancelled,
+      count: counts.cancelled,
+    },
   ];
 
   function href(value: WorkStatusFilter) {
@@ -34,7 +44,7 @@ export function QueueTabs({
 
   return (
     <nav
-      aria-label="Filter by status"
+      aria-label={t.workOrders.tabsAria}
       className="flex gap-2 overflow-x-auto pb-1"
     >
       {tabs.map((t) => {

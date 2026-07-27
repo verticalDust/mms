@@ -14,10 +14,13 @@ import { buttonClass, Mono, EmptyState } from "@/components/ui";
 import { WorkStatusChip, PriorityChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
 import { factoryStartOfDay, dueState, formatDate } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { QueueTabs, type WorkStatusFilter } from "./queue-tabs";
 
-export const metadata = { title: "Work orders · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.workOrders };
+}
 
 const STATUS_VALUES: WorkStatus[] = [
   "open",
@@ -26,12 +29,6 @@ const STATUS_VALUES: WorkStatus[] = [
   "cancelled",
 ];
 const PRIORITY_VALUES: WorkPriority[] = ["low", "medium", "high", "critical"];
-const STATUS_LABEL: Record<WorkStatus, string> = {
-  open: "open",
-  in_progress: "in-progress",
-  done: "done",
-  cancelled: "cancelled",
-};
 
 export default async function WorkOrdersPage({
   searchParams,
@@ -39,6 +36,7 @@ export default async function WorkOrdersPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const user = await requireUser();
+  const t = await getT();
   const sp = await searchParams;
 
   const q = typeof sp.q === "string" ? sp.q : "";
@@ -111,22 +109,22 @@ export default async function WorkOrdersPage({
   const trulyEmpty =
     !explicitFilter && counts.active + counts.done + counts.cancelled === 0;
   const emptyTitle = explicitFilter
-    ? "No work orders match these filters."
+    ? t.workOrders.emptyNoMatch
     : status
-      ? `No ${STATUS_LABEL[status]} work orders.`
-      : "No active work orders.";
+      ? t.workOrders.emptyByStatus[status]
+      : t.workOrders.emptyNoActive;
 
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          Work orders
+          {t.nav.workOrders}
         </h1>
         {user.role === "admin" && (
           <Link href="/work-orders/new" className={buttonClass("primary")}>
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New work order</span>
-            <span className="sm:hidden">New</span>
+            <span className="hidden sm:inline">{t.workOrders.newWorkOrder}</span>
+            <span className="sm:hidden">{t.workOrders.newShort}</span>
           </Link>
         )}
       </div>
@@ -134,13 +132,13 @@ export default async function WorkOrdersPage({
       <QueueTabs active={activeTab} counts={counts} baseParams={baseParams} />
 
       <SearchFilterBar
-        placeholder="Search work orders…"
+        placeholder={t.workOrders.searchPlaceholder}
         selects={[
           {
             param: "assignee",
-            allLabel: "Anyone",
+            allLabel: t.workOrders.filterAnyone,
             options: [
-              { value: "unassigned", label: "Unassigned" },
+              { value: "unassigned", label: t.workOrders.unassigned },
               ...options.assignees.map((a) => ({
                 value: String(a.id),
                 label: a.name,
@@ -151,7 +149,7 @@ export default async function WorkOrdersPage({
             ? [
                 {
                   param: "machine",
-                  allLabel: "Any machine",
+                  allLabel: t.workOrders.filterAnyMachine,
                   options: options.machines.map((m) => ({
                     value: String(m.id),
                     label: `${m.code} · ${m.name}`,
@@ -161,10 +159,10 @@ export default async function WorkOrdersPage({
             : []),
           {
             param: "priority",
-            allLabel: "Any priority",
+            allLabel: t.workOrders.filterAnyPriority,
             options: PRIORITY_VALUES.map((p) => ({
               value: p,
-              label: p[0].toUpperCase() + p.slice(1),
+              label: t.priority[p],
             })),
           },
         ]}
@@ -177,7 +175,7 @@ export default async function WorkOrdersPage({
             className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2.5 py-1 font-condensed text-[13px] font-medium tracking-wide text-red-700 hover:bg-red-100"
           >
             <Clock className="h-3.5 w-3.5" />
-            Overdue only
+            {t.workOrders.overdueOnly}
             <X className="h-3.5 w-3.5" />
           </Link>
         </div>
@@ -187,12 +185,12 @@ export default async function WorkOrdersPage({
         trulyEmpty ? (
           <EmptyState
             icon={<ClipboardList className="h-6 w-6" />}
-            title="No work orders yet."
+            title={t.workOrders.emptyNone}
             action={
               user.role === "admin" ? (
                 <Link href="/work-orders/new" className={buttonClass("primary")}>
                   <Plus className="h-4 w-4" />
-                  New work order
+                  {t.workOrders.newWorkOrder}
                 </Link>
               ) : undefined
             }
@@ -204,7 +202,7 @@ export default async function WorkOrdersPage({
             action={
               explicitFilter ? (
                 <Link href="/work-orders" className={buttonClass("secondary")}>
-                  Clear filters
+                  {t.common.clearFiltersAction}
                 </Link>
               ) : undefined
             }
@@ -258,7 +256,7 @@ export default async function WorkOrdersPage({
           </div>
           {truncated && (
             <p className="text-[13px] text-slate-500">
-              Showing the first 100 — narrow the filters to see more.
+              {t.workOrders.truncated(100)}
             </p>
           )}
         </>
@@ -277,6 +275,7 @@ async function DueCell({
   timeZone: string;
 }) {
   const locale = await getLocale();
+  const t = await getT();
   if (row.status === "done" || row.status === "cancelled") {
     return row.completedAt ? (
       <Mono className="text-[13px] text-slate-500">
@@ -292,14 +291,18 @@ async function DueCell({
       return (
         <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
           <Clock className="h-3.5 w-3.5" />
-          <Mono>{ds.days}d</Mono> over
+          <Mono>
+            {ds.days}
+            {t.common.dayShort}
+          </Mono>{" "}
+          {t.due.over}
         </span>
       );
     case "today":
       return (
         <span className="inline-flex items-center gap-1 text-[13px] text-amber-700">
           <Clock className="h-3.5 w-3.5" />
-          Due today
+          {t.due.today}
         </span>
       );
     case "future":

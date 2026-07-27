@@ -9,8 +9,13 @@ import { appBaseUrl, machineScanPath } from "@/lib/url";
 import { QrImage } from "@/components/qr";
 import { EmptyState, Mono, buttonClass } from "@/components/ui";
 import { PrintButton } from "@/components/print-button";
+import { getT } from "@/lib/i18n/server";
+import { getMessages } from "@/lib/i18n/messages";
+import type { Metadata } from "next";
 
-export const metadata = { title: "QR labels · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.qrLabels };
+}
 
 // A4 label sheet (E1-S5). Print-CSS, not a PDF pipeline. `?ids=` prints a
 // selection (from a machine page); no ids prints every active machine. The QR
@@ -21,6 +26,7 @@ export default async function LabelsPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const sp = await searchParams;
 
   // "?ids=" present → print that selection; absent → print all active. A
@@ -70,33 +76,30 @@ export default async function LabelsPage({
           className="inline-flex items-center gap-1.5 text-[14px] text-slate-500 hover:text-slate-700"
         >
           <ArrowLeft className="h-4 w-4" />
-          Machines
+          {t.nav.machines}
         </Link>
         <div className="flex items-center gap-3">
           <span className="text-[13px] text-slate-500">
-            {labels.length} label{labels.length === 1 ? "" : "s"}
+            {t.print.labelCount(labels.length)}
           </span>
-          {labels.length > 0 && <PrintButton>Print</PrintButton>}
+          {labels.length > 0 && <PrintButton>{t.print.print}</PrintButton>}
         </div>
       </div>
 
       <div className="mb-4 print:hidden">
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          QR labels
+          {t.print.qrLabels}
         </h1>
-        <p className="mt-1 text-[14px] text-slate-500">
-          Preview mirrors the printed sheet. Mount one on each machine. Any scan
-          reaches the right place.
-        </p>
+        <p className="mt-1 text-[14px] text-slate-500">{t.print.intro}</p>
       </div>
 
       {labels.length === 0 ? (
         <EmptyState
           icon={<ScanLine className="h-6 w-6" />}
-          title="No machines to print labels for."
+          title={t.print.empty}
           action={
             <Link href="/machines" className={buttonClass("secondary")}>
-              Back to machines
+              {t.print.backToMachines}
             </Link>
           }
         />
@@ -110,7 +113,7 @@ export default async function LabelsPage({
               <QrImage
                 svg={m.svg}
                 className="h-24 w-24 shrink-0"
-                label={`QR code for machine ${m.code}`}
+                label={t.machines.qrCodeLabel(m.code)}
               />
               <div className="flex min-w-0 flex-col">
                 <Mono className="text-[15px] font-semibold text-slate-900">
@@ -119,8 +122,13 @@ export default async function LabelsPage({
                 <span className="line-clamp-2 font-condensed text-[13px] leading-snug text-slate-700">
                   {m.name}
                 </span>
+                {/* The physical label caption is bilingual (BG primary), so a
+                    scan works for anyone regardless of who printed the sheet. */}
                 <span className="mt-1.5 text-[10px] leading-tight text-slate-500">
-                  Scan to report a fault
+                  {getMessages("bg").print.scanToReport}
+                </span>
+                <span className="text-[9px] leading-tight text-slate-400">
+                  {getMessages("en").print.scanToReport}
                 </span>
               </div>
             </div>

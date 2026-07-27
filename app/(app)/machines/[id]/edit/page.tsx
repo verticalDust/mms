@@ -2,12 +2,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { machines } from "@/lib/db/schema";
+import { getT } from "@/lib/i18n/server";
 import { MachineForm } from "../../machine-form";
 
-export const metadata = { title: "Edit machine · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.editMachine };
+}
 
 export default async function EditMachinePage({
   params,
@@ -15,6 +19,7 @@ export default async function EditMachinePage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -35,7 +40,7 @@ export default async function EditMachinePage({
         {machine.name}
       </Link>
       <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-        Edit machine
+        {t.machines.editMachine}
       </h1>
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <MachineForm

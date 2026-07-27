@@ -5,9 +5,13 @@ import { ArrowLeft } from "lucide-react";
 import { requireAdmin } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { parts } from "@/lib/db/schema";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { PartForm } from "../../parts-form";
 
-export const metadata = { title: "Edit part · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.editPart };
+}
 
 export default async function EditPartPage({
   params,
@@ -15,6 +19,7 @@ export default async function EditPartPage({
   params: Promise<{ id: string }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
 
@@ -31,7 +36,7 @@ export default async function EditPartPage({
         {part.name}
       </Link>
       <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-        Edit part
+        {t.parts.editPart}
       </h1>
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <PartForm

@@ -4,6 +4,8 @@ import { useActionState, useCallback, useEffect, useRef, useState } from "react"
 import { Plus, Minus, Scale, X } from "lucide-react";
 import { Field, Input, Textarea, Mono, buttonClass } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
+import type { Messages } from "@/lib/i18n/messages";
 import {
   receiveStock,
   issueStock,
@@ -25,32 +27,39 @@ type Cfg = {
   icon: typeof Plus;
 };
 
-const CONFIG: Record<Mode, Cfg> = {
-  receive: {
-    action: receiveStock,
-    title: "Receive stock",
-    verb: "Receive",
-    trigger: "Receive",
-    triggerVariant: "primary",
-    icon: Plus,
-  },
-  issue: {
-    action: issueStock,
-    title: "Issue stock",
-    verb: "Issue",
-    trigger: "Issue",
-    triggerVariant: "secondary",
-    icon: Minus,
-  },
-  adjust: {
-    action: adjustStock,
-    title: "Adjust count",
-    verb: "Save count",
-    trigger: "Adjust",
-    triggerVariant: "secondary",
-    icon: Scale,
-  },
-};
+// Built per-locale from the catalog. The trigger reuses the ledger movement
+// label so the button and the resulting ledger row read the same word.
+function config(mode: Mode, t: Messages): Cfg {
+  switch (mode) {
+    case "receive":
+      return {
+        action: receiveStock,
+        title: t.parts.receiveTitle,
+        verb: t.parts.receiveVerb,
+        trigger: t.movement.receive,
+        triggerVariant: "primary",
+        icon: Plus,
+      };
+    case "issue":
+      return {
+        action: issueStock,
+        title: t.parts.issueTitle,
+        verb: t.parts.issueVerb,
+        trigger: t.movement.issue,
+        triggerVariant: "secondary",
+        icon: Minus,
+      };
+    case "adjust":
+      return {
+        action: adjustStock,
+        title: t.parts.adjustTitle,
+        verb: t.parts.adjustVerb,
+        trigger: t.movement.adjust,
+        triggerVariant: "secondary",
+        icon: Scale,
+      };
+  }
+}
 
 // One dialog shell, three modes (SCREENS §6). Native <dialog> gives the backdrop,
 // focus trap, and ESC for free. The inner form is remounted on every open (keyed
@@ -69,7 +78,8 @@ export function StockDialog({
   unit: string;
   bin: string | null;
 }) {
-  const cfg = CONFIG[mode];
+  const t = useT();
+  const cfg = config(mode, t);
   const Icon = cfg.icon;
   const ref = useRef<HTMLDialogElement>(null);
   const [openSeq, setOpenSeq] = useState(0);
@@ -140,6 +150,7 @@ function StockForm({
     cfg.action,
     {},
   );
+  const t = useT();
 
   useEffect(() => {
     if (state.ok) onDone();
@@ -156,10 +167,12 @@ function StockForm({
             {cfg.title}
           </h2>
           <p className="text-[13px] text-slate-500">
-            On hand <Mono className="text-slate-700">{onHand}</Mono> {unit}
+            {t.parts.onHandLabel} <Mono className="text-slate-700">{onHand}</Mono>{" "}
+            {unit}
             {bin && (
               <>
-                {" · bin "}
+                {" · "}
+                {t.parts.bin}{" "}
                 <Mono className="text-slate-700">{bin}</Mono>
               </>
             )}
@@ -167,7 +180,7 @@ function StockForm({
         </div>
         <button
           type="button"
-          aria-label="Close"
+          aria-label={t.common.close}
           onClick={onDone}
           className="flex h-11 w-11 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer"
         >
@@ -179,9 +192,9 @@ function StockForm({
 
       {mode === "adjust" ? (
         <Field
-          label="Counted quantity"
+          label={t.parts.countedQty}
           htmlFor="counted"
-          hint="What the shelf actually holds right now."
+          hint={t.parts.countedQtyHint}
         >
           <Input
             id="counted"
@@ -197,7 +210,7 @@ function StockForm({
           />
         </Field>
       ) : (
-        <Field label="Quantity" htmlFor="qty">
+        <Field label={t.parts.quantityLabel} htmlFor="qty">
           <Input
             id="qty"
             name="qty"
@@ -214,7 +227,11 @@ function StockForm({
       )}
 
       {mode === "receive" && (
-        <Field label="Unit cost" htmlFor="unitCost" hint="Optional.">
+        <Field
+          label={t.parts.unitCostField}
+          htmlFor="unitCost"
+          hint={t.parts.unitCostHint}
+        >
           <Input
             id="unitCost"
             name="unitCost"
@@ -229,24 +246,36 @@ function StockForm({
       )}
 
       {mode === "receive" && (
-        <Field label="Note" htmlFor="note">
-          <Textarea id="note" name="note" placeholder="e.g. PO number, supplier" />
+        <Field label={t.machines.noteField} htmlFor="note">
+          <Textarea
+            id="note"
+            name="note"
+            placeholder={t.parts.stockNotePlaceholder}
+          />
         </Field>
       )}
 
       {mode === "issue" && (
-        <Field label="Reason" htmlFor="reason" hint="Why it's leaving the store.">
-          <Input id="reason" name="reason" placeholder="e.g. used on Line B" />
+        <Field
+          label={t.parts.reasonField}
+          htmlFor="reason"
+          hint={t.parts.reasonIssueHint}
+        >
+          <Input
+            id="reason"
+            name="reason"
+            placeholder={t.parts.reasonIssuePlaceholder}
+          />
         </Field>
       )}
 
       {mode === "adjust" && (
-        <Field label="Reason" htmlFor="reason">
+        <Field label={t.parts.reasonField} htmlFor="reason">
           <Input
             id="reason"
             name="reason"
             required
-            placeholder="e.g. stock-take correction"
+            placeholder={t.parts.reasonAdjustPlaceholder}
           />
         </Field>
       )}
@@ -264,7 +293,7 @@ function StockForm({
           onClick={onDone}
           className="h-11 text-[14px] text-slate-500 hover:text-slate-700 cursor-pointer"
         >
-          Cancel
+          {t.common.cancel}
         </button>
       </div>
     </form>

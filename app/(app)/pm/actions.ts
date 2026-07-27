@@ -8,6 +8,8 @@ import { db } from "@/lib/db";
 import { pmSchedules, workOrders, machines } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
+import { getT } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/messages";
 import { generateDuePmWorkOrders } from "@/lib/pm";
 
 export type FormState = { error?: string };
@@ -22,25 +24,27 @@ function parseChecklistLines(raw: string): string | null {
   return steps.length ? JSON.stringify(steps) : null;
 }
 
-const scheduleSchema = z.object({
-  title: z.string().trim().min(1, "Title is required."),
-  intervalDays: z
-    .coerce.number()
-    .int()
-    .min(1, "Interval must be at least 1 day.")
-    .max(3650, "Interval can be at most 3650 days."),
-  nextDueDate: z.string().trim().min(1, "Pick a first due date."),
-  defaultAssigneeId: z.coerce.number().int().positive().optional(),
-  checklist: z.string().optional(),
-});
+const scheduleSchema = (t: Messages) =>
+  z.object({
+    title: z.string().trim().min(1, t.pm.errTitleRequired),
+    intervalDays: z
+      .coerce.number()
+      .int()
+      .min(1, t.pm.errIntervalMin)
+      .max(3650, t.pm.errIntervalMax),
+    nextDueDate: z.string().trim().min(1, t.pm.errPickDate),
+    defaultAssigneeId: z.coerce.number().int().positive().optional(),
+    checklist: z.string().optional(),
+  });
 
 async function requirePlanner() {
+  const t = await getT();
   const user = await getCurrentUser();
-  if (!user) return { user: null, error: "Not signed in." as const };
+  if (!user) return { user: null, error: t.common.notSignedIn };
   try {
     authorize(user, "pm:manage");
   } catch {
-    return { user: null, error: "Only a planner can manage PM schedules." as const };
+    return { user: null, error: t.pm.errOnlyPlanner };
   }
   return { user, error: undefined };
 }
@@ -51,12 +55,12 @@ export async function createPmSchedule(
 ): Promise<FormState> {
   const { user, error } = await requirePlanner();
   if (!user) return { error };
+  const t = await getT();
 
   const machineId = Number(formData.get("machineId"));
-  if (!Number.isInteger(machineId))
-    return { error: "That machine no longer exists." };
+  if (!Number.isInteger(machineId)) return { error: t.common.machineGone };
 
-  const parsed = scheduleSchema.safeParse({
+  const parsed = scheduleSchema(t).safeParse({
     title: formData.get("title"),
     intervalDays: formData.get("intervalDays"),
     nextDueDate: formData.get("nextDueDate"),
@@ -64,19 +68,18 @@ export async function createPmSchedule(
     checklist: formData.get("checklist"),
   });
   if (!parsed.success)
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
 
   const [machine] = await db
     .select({ retiredAt: machines.retiredAt })
     .from(machines)
     .where(eq(machines.id, machineId))
     .limit(1);
-  if (!machine) return { error: "That machine no longer exists." };
-  if (machine.retiredAt)
-    return { error: "That machine is retired. You can't schedule PM on it." };
+  if (!machine) return { error: t.common.machineGone };
+  if (machine.retiredAt) return { error: t.pm.errMachineRetired };
 
   const due = new Date(parsed.data.nextDueDate + "T00:00:00");
-  if (isNaN(due.getTime())) return { error: "That first due date isn't valid." };
+  if (isNaN(due.getTime())) return { error: t.pm.errFirstDateInvalid };
 
   await db.insert(pmSchedules).values({
     machineId,
@@ -99,11 +102,12 @@ export async function updatePmSchedule(
 ): Promise<FormState> {
   const { user, error } = await requirePlanner();
   if (!user) return { error };
+  const t = await getT();
 
   const id = Number(formData.get("scheduleId"));
-  if (!Number.isInteger(id)) return { error: "That schedule no longer exists." };
+  if (!Number.isInteger(id)) return { error: t.pm.errScheduleGone };
 
-  const parsed = scheduleSchema.safeParse({
+  const parsed = scheduleSchema(t).safeParse({
     title: formData.get("title"),
     intervalDays: formData.get("intervalDays"),
     nextDueDate: formData.get("nextDueDate"),
@@ -111,17 +115,17 @@ export async function updatePmSchedule(
     checklist: formData.get("checklist"),
   });
   if (!parsed.success)
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
 
   const [existing] = await db
     .select({ machineId: pmSchedules.machineId })
     .from(pmSchedules)
     .where(eq(pmSchedules.id, id))
     .limit(1);
-  if (!existing) return { error: "That schedule no longer exists." };
+  if (!existing) return { error: t.pm.errScheduleGone };
 
   const due = new Date(parsed.data.nextDueDate + "T00:00:00");
-  if (isNaN(due.getTime())) return { error: "That due date isn't valid." };
+  if (isNaN(due.getTime())) return { error: t.pm.errDateInvalid };
 
   await db
     .update(pmSchedules)

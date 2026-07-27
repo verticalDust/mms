@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Ban, Loader2 } from "lucide-react";
 import { buttonClass, Input } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { useT } from "@/lib/i18n/client";
 import { dismissReport, type FormState } from "./actions";
 
 // Dismiss a report from the triage row. Collapsed to a single button until
@@ -15,6 +16,7 @@ export function DismissReport({ reportId }: { reportId: number }) {
     dismissReport,
     {},
   );
+  const t = useT();
 
   if (!open) {
     return (
@@ -24,7 +26,7 @@ export function DismissReport({ reportId }: { reportId: number }) {
         className={cn(buttonClass("secondary"))}
       >
         <Ban className="h-4 w-4" />
-        Dismiss
+        {t.reports.dismiss}
       </button>
     );
   }
@@ -37,7 +39,7 @@ export function DismissReport({ reportId }: { reportId: number }) {
         required
         autoFocus
         maxLength={300}
-        placeholder="Why is this being dismissed?"
+        placeholder={t.reports.dismissPlaceholder}
       />
       {state.error && (
         <p role="alert" className="text-[13px] text-red-600">
@@ -55,14 +57,14 @@ export function DismissReport({ reportId }: { reportId: number }) {
           ) : (
             <Ban className="h-4 w-4" />
           )}
-          Dismiss report
+          {t.reports.dismissReport}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className={cn(buttonClass("ghost"))}
         >
-          Cancel
+          {t.common.cancel}
         </button>
       </div>
     </form>

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Loader2, Trash2, X, ImageOff } from "lucide-react";
 import { buttonClass } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 
 export type JobPhoto = {
   id: number;
@@ -26,6 +27,7 @@ export function JobPhotos({
   max: number;
 }) {
   const router = useRouter();
+  const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,22 +64,25 @@ export function JobPhotos({
       const room = max - photos.length;
       const picked = Array.from(files).slice(0, Math.max(room, 0));
       if (picked.length === 0) {
-        setError(`Up to ${max} photos per job.`);
+        setError(t.workOrders.photosMaxPerJob(max));
         return;
       }
       for (const file of picked) {
-        const blob = await compress(file);
+        const blob = await compress(file, {
+          processFail: t.workOrders.imageProcessFailed,
+          readFail: t.workOrders.imageReadFailed,
+        });
         const fd = new FormData();
         fd.append("photo", blob, "photo.jpg");
         const res = await fetch(uploadUrl, { method: "POST", body: fd });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));
-          throw new Error(j.error || "Upload failed.");
+          throw new Error(j.error || t.workOrders.uploadFailed);
         }
         uploaded++;
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
+      setError(e instanceof Error ? e.message : t.workOrders.uploadFailed);
     } finally {
       // Reflect any photos that DID save, even if a later one in the batch
       // failed — otherwise the tech re-uploads and duplicates them.
@@ -93,12 +98,14 @@ export function JobPhotos({
       const res = await fetch(photoUrl(id), { method: "DELETE" });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "Couldn't remove the photo.");
+        throw new Error(j.error || t.workOrders.removePhotoFailed);
       }
       setActive(null);
       router.refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't remove the photo.");
+      setError(
+        e instanceof Error ? e.message : t.workOrders.removePhotoFailed,
+      );
     } finally {
       setRemovingId(null);
     }
@@ -127,7 +134,7 @@ export function JobPhotos({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photoUrl(p.id)}
-                  alt={`Job photo by ${p.uploader}, ${p.when}`}
+                  alt={t.workOrders.photoAlt(p.uploader, p.when)}
                   loading="lazy"
                   onError={() =>
                     setBroken((s) => new Set(s).add(p.id))
@@ -164,7 +171,7 @@ export function JobPhotos({
             ) : (
               <Camera className="h-4 w-4" />
             )}
-            {full ? `Max ${max} photos` : "Add photos"}
+            {full ? t.workOrders.maxPhotos(max) : t.workOrders.addPhotos}
           </button>
         </>
       )}
@@ -179,7 +186,7 @@ export function JobPhotos({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Job photo"
+          aria-label={t.workOrders.photoDialogLabel}
           className="fixed inset-0 z-50 flex flex-col bg-black/90 p-4"
           onClick={() => setActive(null)}
         >
@@ -193,7 +200,7 @@ export function JobPhotos({
             <button
               ref={closeRef}
               type="button"
-              aria-label="Close"
+              aria-label={t.common.close}
               onClick={() => setActive(null)}
               className="flex h-11 w-11 items-center justify-center rounded-md text-white hover:bg-white/10"
             >
@@ -204,7 +211,7 @@ export function JobPhotos({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={photoUrl(active.id)}
-              alt={`Job photo by ${active.uploader}, ${active.when}`}
+              alt={t.workOrders.photoAlt(active.uploader, active.when)}
               onClick={(e) => e.stopPropagation()}
               className="max-h-full max-w-full object-contain"
             />
@@ -225,7 +232,7 @@ export function JobPhotos({
                 ) : (
                   <Trash2 className="h-4 w-4" />
                 )}
-                Remove photo
+                {t.workOrders.removePhoto}
               </button>
             </div>
           )}
@@ -237,7 +244,11 @@ export function JobPhotos({
 
 // Downscale to ≤1600px on the long edge, re-encode JPEG q0.85 in the browser so
 // job photos (which document findings) upload small without a server image lib.
-function compress(file: File): Promise<Blob> {
+// Failure messages are passed in (this runs outside the component, no hooks).
+function compress(
+  file: File,
+  msgs: { processFail: string; readFail: string },
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -254,18 +265,17 @@ function compress(file: File): Promise<Blob> {
       canvas.height = height;
       const ctx = canvas.getContext("2d");
       URL.revokeObjectURL(url);
-      if (!ctx) return reject(new Error("Couldn't process the image."));
+      if (!ctx) return reject(new Error(msgs.processFail));
       ctx.drawImage(img, 0, 0, width, height);
       canvas.toBlob(
-        (b) =>
-          b ? resolve(b) : reject(new Error("Couldn't process the image.")),
+        (b) => (b ? resolve(b) : reject(new Error(msgs.processFail))),
         "image/jpeg",
         0.85,
       );
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("Couldn't read that image."));
+      reject(new Error(msgs.readFail));
     };
     img.src = url;
   });

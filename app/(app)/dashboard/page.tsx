@@ -28,10 +28,13 @@ import {
   type WorkBucket,
   type BucketBoundaries,
 } from "@/lib/format";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { cn } from "@/lib/cn";
 
-export const metadata = { title: "Dashboard · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.dashboard };
+}
 
 type Tone = "red" | "amber" | "slate";
 
@@ -79,6 +82,7 @@ function Gauge({
 
 export default async function DashboardPage() {
   const user = await requireUser();
+  const t = await getT();
   const timeZone = (await getSettings())?.timezone ?? "UTC";
   // Every "today / overdue / this week" decision is made in the factory's zone,
   // not the server's (PLAN §1.5) — the gauge count, the queue rail, and these
@@ -107,57 +111,57 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-          Dashboard
+          {t.nav.dashboard}
         </h1>
       </div>
 
       {/* Gauge readout row — each tile deep-links to its filtered list */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Gauge
-          label="Open jobs"
+          label={t.dashboard.gaugeOpenJobs}
           value={counts.openJobs}
           href="/work-orders"
           tone="slate"
           hot={false}
-          clearWord="None open"
+          clearWord={t.dashboard.clearNoneOpen}
           hotChip={null}
         />
         <Gauge
-          label="Overdue"
+          label={t.dashboard.gaugeOverdue}
           value={counts.overdue}
           href="/work-orders?overdue=1"
           tone="red"
           hot={counts.overdue > 0}
-          clearWord="None overdue"
+          clearWord={t.dashboard.clearNoneOverdue}
           hotChip={
             <StatusChip tone="red" icon={TriangleAlert}>
-              Overdue
+              {t.dashboard.chipOverdue}
             </StatusChip>
           }
         />
         <Gauge
-          label="Machines down"
+          label={t.dashboard.gaugeMachinesDown}
           value={counts.machinesDown}
           href="/machines?status=down"
           tone="red"
           hot={counts.machinesDown > 0}
-          clearWord="All running"
+          clearWord={t.dashboard.clearAllRunning}
           hotChip={
             <StatusChip tone="red" icon={OctagonX}>
-              Down
+              {t.dashboard.chipDown}
             </StatusChip>
           }
         />
         <Gauge
-          label="Low stock"
+          label={t.dashboard.gaugeLowStock}
           value={counts.lowStock}
           href="/parts?low=1"
           tone="amber"
           hot={counts.lowStock > 0}
-          clearWord="Stock OK"
+          clearWord={t.dashboard.clearStockOk}
           hotChip={
             <StatusChip tone="amber" icon={TriangleAlert}>
-              Low stock
+              {t.dashboard.chipLowStock}
             </StatusChip>
           }
         />
@@ -165,15 +169,15 @@ export default async function DashboardPage() {
             /reports' requireAdmin() straight back here, so don't offer it. */}
         {isAdmin && (
           <Gauge
-            label="Untriaged reports"
+            label={t.dashboard.gaugeUntriaged}
             value={counts.untriaged}
             href="/reports"
             tone="slate"
             hot={counts.untriaged > 0}
-            clearWord="Inbox clear"
+            clearWord={t.dashboard.clearInboxClear}
             hotChip={
               <StatusChip tone="slate" icon={Inbox}>
-                To triage
+                {t.dashboard.chipToTriage}
               </StatusChip>
             }
           />
@@ -182,43 +186,43 @@ export default async function DashboardPage() {
 
       {/* Open work, bucketed in factory time — the standup screen (E6-S2) */}
       <div className="flex flex-col gap-5">
-        <SectionLabel>Open work · this week</SectionLabel>
+        <SectionLabel>{t.dashboard.openWorkThisWeek}</SectionLabel>
         {openWork.length === 0 ? (
           <EmptyState
             icon={<ClipboardList className="h-6 w-6" />}
-            title="No open work orders."
+            title={t.dashboard.noOpenWork}
           />
         ) : (
           <div className="flex flex-col gap-5">
             <Bucket
               bucket="overdue"
-              label="Overdue"
+              label={t.dashboard.bucketOverdue}
               rows={buckets.overdue}
-              clearWord="None overdue"
+              clearWord={t.dashboard.bucketNoneOverdue}
               timeZone={timeZone}
               bounds={bounds}
             />
             <Bucket
               bucket="today"
-              label="Today"
+              label={t.dashboard.bucketToday}
               rows={buckets.today}
-              clearWord="Nothing due today"
+              clearWord={t.dashboard.bucketNothingToday}
               timeZone={timeZone}
               bounds={bounds}
             />
             <Bucket
               bucket="week"
-              label="This week"
+              label={t.dashboard.bucketThisWeek}
               rows={buckets.week}
-              clearWord="Nothing later this week"
+              clearWord={t.dashboard.bucketNothingThisWeek}
               timeZone={timeZone}
               bounds={bounds}
             />
             <Bucket
               bucket="later"
-              label="Later"
+              label={t.dashboard.bucketLater}
               rows={buckets.later}
-              clearWord="Nothing scheduled later"
+              clearWord={t.dashboard.bucketNothingLater}
               timeZone={timeZone}
               bounds={bounds}
             />
@@ -335,6 +339,7 @@ async function DueCell({
   bounds: BucketBoundaries;
 }) {
   const locale = await getLocale();
+  const t = await getT();
   // Pass startOfTomorrow so the "today" label agrees with bucketOf on a
   // DST-transition day (both use the same DST-correct boundary).
   const ds = dueState(dueDate, bounds.startOfToday, bounds.startOfTomorrow);
@@ -342,14 +347,18 @@ async function DueCell({
     return (
       <span className="inline-flex items-center gap-1 text-[13px] text-red-600">
         <Clock className="h-3.5 w-3.5" />
-        <Mono>{ds.days}d</Mono> over
+        <Mono>
+          {ds.days}
+          {t.common.dayShort}
+        </Mono>{" "}
+        {t.due.over}
       </span>
     );
   if (ds.kind === "today")
     return (
       <span className="inline-flex items-center gap-1 text-[13px] text-amber-700">
         <Clock className="h-3.5 w-3.5" />
-        Due today
+        {t.due.today}
       </span>
     );
   if (ds.kind === "future")
@@ -358,5 +367,5 @@ async function DueCell({
         {formatDate(ds.date, locale, timeZone)}
       </Mono>
     );
-  return <span className="text-[13px] text-slate-500">No date</span>;
+  return <span className="text-[13px] text-slate-500">{t.due.noDate}</span>;
 }

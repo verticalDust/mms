@@ -9,9 +9,13 @@ import { searchUnattachedParts, stockLevel } from "@/lib/queries";
 import { Mono, EmptyState, buttonClass } from "@/components/ui";
 import { StockStatusChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
+import { getT } from "@/lib/i18n/server";
+import type { Metadata } from "next";
 import { AttachPartForm } from "./attach-part-form";
 
-export const metadata = { title: "Add part to machine · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.addPartToMachine };
+}
 
 export default async function AttachPartPage({
   params,
@@ -21,6 +25,7 @@ export default async function AttachPartPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const sp = await searchParams;
@@ -79,10 +84,10 @@ export default async function AttachPartPage({
             className="inline-flex items-center gap-1.5 text-[14px] text-slate-500 hover:text-slate-700"
           >
             <ArrowLeft className="h-4 w-4" />
-            Choose a different part
+            {t.workOrders.chooseDifferent}
           </Link>
           <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-            Add part to {machine.name}
+            {t.machines.addPartToMachine(machine.name)}
           </h1>
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
@@ -91,7 +96,7 @@ export default async function AttachPartPage({
                 <div className="text-[15px] text-slate-900">{part.name}</div>
                 {part.binLocation && (
                   <div className="text-[13px] text-slate-500">
-                    bin <Mono>{part.binLocation}</Mono>
+                    {t.parts.bin} <Mono>{part.binLocation}</Mono>
                   </div>
                 )}
               </div>
@@ -123,24 +128,24 @@ export default async function AttachPartPage({
         {machine.name}
       </Link>
       <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-        Add a part to {machine.name}
+        {t.machines.addPartToMachine(machine.name)}
       </h1>
 
-      <SearchFilterBar placeholder="Search SKU, name or bin…" />
+      <SearchFilterBar placeholder={t.parts.searchSkuNameBin} />
 
       {results.length === 0 ? (
         q ? (
           <EmptyState
             icon={<SearchX className="h-6 w-6" />}
-            title="No matching parts, or every match is already on this machine."
+            title={t.machines.noMatchOrAttached}
           />
         ) : (
           <EmptyState
             icon={<Package className="h-6 w-6" />}
-            title="Every part is already attached, or there are no parts yet."
+            title={t.machines.everyPartAttached}
             action={
               <Link href="/parts/new" className={buttonClass("secondary")}>
-                Add a part to the catalog
+                {t.parts.addToCatalog}
               </Link>
             }
           />
@@ -163,7 +168,7 @@ export default async function AttachPartPage({
                   </div>
                   {p.binLocation && (
                     <div className="truncate text-[13px] text-slate-500">
-                      bin <Mono>{p.binLocation}</Mono>
+                      {t.parts.bin} <Mono>{p.binLocation}</Mono>
                     </div>
                   )}
                 </div>
@@ -174,7 +179,7 @@ export default async function AttachPartPage({
           </div>
           {capped && (
             <p className="text-[13px] text-slate-500">
-              Showing the first {PICK_CAP}. Refine your search to narrow.
+              {t.parts.showingFirst(PICK_CAP)}
             </p>
           )}
         </>

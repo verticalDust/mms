@@ -7,11 +7,13 @@ import {
   adminRecipients,
 } from "@/lib/queries";
 import { mailEnabled, sendMail } from "@/lib/email";
+import { getMessages, type Messages } from "@/lib/i18n/messages";
+import type { Locale } from "@/lib/i18n/config";
 
-// The daily planner digest (E6-S3): overdue jobs + low-stock parts, one English
-// email per admin, early factory morning. Silent on a clean day. Best-effort —
-// a relay outage is logged and simply retried by tomorrow's run (the digest is
-// stateless: it recomputes fresh each morning, so there is nothing to queue).
+// The daily planner digest (E6-S3): overdue jobs + low-stock parts, one email
+// per admin in that admin's language, early factory morning. Silent on a clean
+// day. Best-effort — a relay outage is logged and simply retried by tomorrow's
+// run (the digest is stateless: it recomputes fresh each morning).
 
 export type DigestData = {
   overdue: {
@@ -103,6 +105,7 @@ function sectionHeader(label: string): string {
 function overdueRow(
   r: DigestData["overdue"][number],
   baseUrl: string,
+  t: Messages,
 ): string {
   return `<tr><td style="padding:0 24px;">
     <a href="${baseUrl}/work-orders/${r.workOrderId}" style="display:block;text-decoration:none;border-left:3px solid #DC2626;padding:10px 12px;border-bottom:1px solid ${C.hair};">
@@ -111,16 +114,24 @@ function overdueRow(
       <span style="${SANS}color:${C.quiet};font-size:13px;"><span style="${MONO}">${esc(
         r.machineCode,
       )}</span> · ${esc(r.machineName)}</span>
-      <span style="${SANS}color:${C.red};font-size:13px;"> &nbsp;●&nbsp;${r.daysOverdue}d over</span>
+      <span style="${SANS}color:${C.red};font-size:13px;"> &nbsp;●&nbsp;${esc(
+        t.digest.daysOver(r.daysOverdue),
+      )}</span>
     </a></td></tr>`;
 }
 
-function lowRow(r: DigestData["lowStock"][number], baseUrl: string): string {
+function lowRow(
+  r: DigestData["lowStock"][number],
+  baseUrl: string,
+  t: Messages,
+): string {
   return `<tr><td style="padding:0 24px;">
     <a href="${baseUrl}/parts/${r.partId}" style="display:block;text-decoration:none;padding:10px 12px;border-bottom:1px solid ${C.hair};">
       <span style="${SANS}color:${C.ink};font-size:15px;">${esc(r.name)}</span>
       <span style="${MONO}font-size:12px;color:${C.quiet};"> &nbsp;${esc(r.sku)}</span><br>
-      <span style="${SANS}color:${C.amber};font-size:13px;">▲ on hand <span style="${MONO}">${r.onHand}</span> / min <span style="${MONO}">${r.minLevel}</span></span>
+      <span style="${SANS}color:${C.amber};font-size:13px;">▲ ${esc(
+        t.digest.onHandMin(r.onHand, r.minLevel),
+      )}</span>
     </a></td></tr>`;
 }
 
@@ -129,16 +140,17 @@ export function renderDigestHtml(
   baseUrl: string,
   factoryName: string,
   dateStr: string,
+  t: Messages,
 ): string {
   const overdue =
     d.overdue.length > 0
-      ? sectionHeader(`Overdue jobs (${d.overdue.length})`) +
-        d.overdue.map((r) => overdueRow(r, baseUrl)).join("")
+      ? sectionHeader(t.digest.overdueJobs(d.overdue.length)) +
+        d.overdue.map((r) => overdueRow(r, baseUrl, t)).join("")
       : "";
   const low =
     d.lowStock.length > 0
-      ? sectionHeader(`Low-stock parts (${d.lowStock.length})`) +
-        d.lowStock.map((r) => lowRow(r, baseUrl)).join("")
+      ? sectionHeader(t.digest.lowStockParts(d.lowStock.length)) +
+        d.lowStock.map((r) => lowRow(r, baseUrl, t)).join("")
       : "";
   return `<!doctype html><html><body style="margin:0;background:${C.bg};">
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:${C.bg};">
@@ -151,7 +163,7 @@ export function renderDigestHtml(
         ${overdue}
         ${low}
         <tr><td style="padding:16px 24px;border-top:1px solid ${C.hair};${SANS}font-size:12px;color:${C.quiet};">
-          Open the dashboard → <a href="${baseUrl}/dashboard" style="color:${C.orange};text-decoration:none;">MMS</a>
+          ${esc(t.digest.openDashboard)} → <a href="${baseUrl}/dashboard" style="color:${C.orange};text-decoration:none;">MMS</a>
         </td></tr>
       </table>
     </td></tr>
@@ -164,25 +176,28 @@ export function renderDigestText(
   baseUrl: string,
   factoryName: string,
   dateStr: string,
+  t: Messages,
 ): string {
   const lines: string[] = [`MMS — ${factoryName} — ${dateStr}`, ""];
   if (d.overdue.length) {
-    lines.push(`Overdue jobs (${d.overdue.length}):`);
+    lines.push(`${t.digest.overdueJobs(d.overdue.length)}:`);
     for (const r of d.overdue)
       lines.push(
-        `  WO-${r.workOrderId} · ${r.title} — ${r.machineCode} ${r.machineName} — ${r.daysOverdue}d over  ${baseUrl}/work-orders/${r.workOrderId}`,
+        `  WO-${r.workOrderId} · ${r.title} — ${r.machineCode} ${r.machineName} — ${t.digest.daysOver(
+          r.daysOverdue,
+        )}  ${baseUrl}/work-orders/${r.workOrderId}`,
       );
     lines.push("");
   }
   if (d.lowStock.length) {
-    lines.push(`Low-stock parts (${d.lowStock.length}):`);
+    lines.push(`${t.digest.lowStockParts(d.lowStock.length)}:`);
     for (const r of d.lowStock)
       lines.push(
-        `  ${r.name} (${r.sku}) — on hand ${r.onHand} / min ${r.minLevel}  ${baseUrl}/parts/${r.partId}`,
+        `  ${r.name} (${r.sku}) — ${t.digest.onHandMin(r.onHand, r.minLevel)}  ${baseUrl}/parts/${r.partId}`,
       );
     lines.push("");
   }
-  lines.push(`Dashboard: ${baseUrl}/dashboard`);
+  lines.push(`${t.digest.dashboardLabel} ${baseUrl}/dashboard`);
   return lines.join("\n");
 }
 
@@ -213,17 +228,32 @@ export async function sendDailyDigest(
   if (admins.length === 0) return { skipped: "no-admins" };
 
   const baseUrl = await appBaseUrl();
-  // P1: temporary — the digest is made per-recipient-locale in P6.
-  const dateStr = formatDate(now, "en", timeZone);
-  const html = renderDigestHtml(data, baseUrl, factoryName, dateStr);
-  const text = renderDigestText(data, baseUrl, factoryName, dateStr);
-  const subject = `${factoryName} · ${data.overdue.length} overdue, ${data.lowStock.length} low on stock`;
+
+  // Group admins by language and render the email once per distinct locale, so
+  // each recipient reads the digest in their own language.
+  const byLocale = new Map<Locale, typeof admins>();
+  for (const a of admins) {
+    const group = byLocale.get(a.locale) ?? [];
+    group.push(a);
+    byLocale.set(a.locale, group);
+  }
 
   let sent = 0;
   let failed = 0;
-  for (const a of admins) {
-    const ok = await sendMail({ to: a.email, subject, html, text });
-    ok ? sent++ : failed++;
+  for (const [locale, group] of byLocale) {
+    const t = getMessages(locale);
+    const dateStr = formatDate(now, locale, timeZone);
+    const html = renderDigestHtml(data, baseUrl, factoryName, dateStr, t);
+    const text = renderDigestText(data, baseUrl, factoryName, dateStr, t);
+    const subject = t.digest.subject(
+      factoryName,
+      data.overdue.length,
+      data.lowStock.length,
+    );
+    for (const a of group) {
+      const ok = await sendMail({ to: a.email, subject, html, text });
+      ok ? sent++ : failed++;
+    }
   }
   return {
     recipients: admins.length,

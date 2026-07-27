@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Field, Input } from "@/components/ui";
 import { SubmitButton } from "@/components/submit-button";
+import { useT } from "@/lib/i18n/client";
 import { addPartToJob, type FormState } from "../../../actions";
 
 export function AddPartToJobForm({
@@ -17,14 +18,15 @@ export function AddPartToJobForm({
   unit: string;
 }) {
   const [state, action] = useActionState<FormState, FormData>(addPartToJob, {});
+  const t = useT();
   return (
     <form action={action} className="flex flex-col gap-4">
       <input type="hidden" name="workOrderId" value={workOrderId} />
       <input type="hidden" name="partId" value={partId} />
       <Field
-        label="Quantity used"
+        label={t.workOrders.quantityUsed}
         htmlFor="quantity"
-        hint={`${onHand} ${unit} on hand. Stock drops by what you record.`}
+        hint={t.workOrders.quantityHint(onHand, unit)}
       >
         <Input
           id="quantity"
@@ -43,7 +45,7 @@ export function AddPartToJobForm({
           {state.error}
         </p>
       )}
-      <SubmitButton>Add to job</SubmitButton>
+      <SubmitButton>{t.workOrders.addToJob}</SubmitButton>
     </form>
   );
 }

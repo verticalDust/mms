@@ -14,15 +14,18 @@ import {
 } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
+import { getT } from "@/lib/i18n/server";
+import type { Messages } from "@/lib/i18n/messages";
 
 export type FormState = { error?: string };
 
-const createSchema = z.object({
-  name: z.string().trim().min(1, "Name is required."),
-  code: z.string().trim().optional(),
-  location: z.string().trim().optional(),
-  notes: z.string().trim().optional(),
-});
+const createSchema = (t: Messages) =>
+  z.object({
+    name: z.string().trim().min(1, t.machines.errNameRequired),
+    code: z.string().trim().optional(),
+    location: z.string().trim().optional(),
+    notes: z.string().trim().optional(),
+  });
 
 async function suggestCode(): Promise<string> {
   const [row] = await db
@@ -37,21 +40,22 @@ export async function createMachine(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "machine:manage");
   } catch {
-    return { error: "Only an admin can add machines." };
+    return { error: t.machines.errOnlyAdminAdd };
   }
 
-  const parsed = createSchema.safeParse({
+  const parsed = createSchema(t).safeParse({
     name: formData.get("name"),
     code: formData.get("code"),
     location: formData.get("location"),
     notes: formData.get("notes"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
 
   const code = parsed.data.code || (await suggestCode());
@@ -71,7 +75,7 @@ export async function createMachine(
     newId = row.id;
   } catch (e) {
     if (String(e).includes("UNIQUE")) {
-      return { error: `A machine with code ${code} already exists.` };
+      return { error: t.machines.errCodeExists(code) };
     }
     throw e;
   }
@@ -80,27 +84,29 @@ export async function createMachine(
   redirect(`/machines/${newId}`);
 }
 
-const updateSchema = z.object({
-  id: z.coerce.number().int().positive(),
-  name: z.string().trim().min(1, "Name is required."),
-  code: z.string().trim().min(1, "Code is required."),
-  location: z.string().trim().optional(),
-  notes: z.string().trim().optional(),
-});
+const updateSchema = (t: Messages) =>
+  z.object({
+    id: z.coerce.number().int().positive(),
+    name: z.string().trim().min(1, t.machines.errNameRequired),
+    code: z.string().trim().min(1, t.machines.errCodeRequired),
+    location: z.string().trim().optional(),
+    notes: z.string().trim().optional(),
+  });
 
 export async function updateMachine(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "machine:manage");
   } catch {
-    return { error: "Only an admin can edit machines." };
+    return { error: t.machines.errOnlyAdminEdit };
   }
 
-  const parsed = updateSchema.safeParse({
+  const parsed = updateSchema(t).safeParse({
     id: formData.get("id"),
     name: formData.get("name"),
     code: formData.get("code"),
@@ -108,7 +114,7 @@ export async function updateMachine(
     notes: formData.get("notes"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
 
   try {
@@ -124,7 +130,7 @@ export async function updateMachine(
       .where(eq(machines.id, parsed.data.id));
   } catch (e) {
     if (String(e).includes("UNIQUE")) {
-      return { error: `A machine with code ${parsed.data.code} already exists.` };
+      return { error: t.machines.errCodeExists(parsed.data.code) };
     }
     throw e;
   }
@@ -157,6 +163,8 @@ export async function retireMachine(formData: FormData): Promise<void> {
         endedAt: now,
         durationMs: sql`${nowMs} - ${downtimePeriods.startedAt}`,
         closedBy: user.id,
+        // STORED token — persisted in English, translated at display via
+        // lib/i18n/system-notes. Do NOT localize.
         note: "Closed on machine retirement",
       })
       .where(
@@ -215,11 +223,12 @@ export async function attachPart(
   formData: FormData,
 ): Promise<FormState> {
   const user = await getCurrentUser();
-  if (!user) return { error: "Not signed in." };
+  const t = await getT();
+  if (!user) return { error: t.common.notSignedIn };
   try {
     authorize(user, "machine:manage");
   } catch {
-    return { error: "Only an admin can attach parts." };
+    return { error: t.machines.errOnlyAdminAttach };
   }
 
   const parsed = attachSchema.safeParse({
@@ -229,7 +238,7 @@ export async function attachPart(
     note: formData.get("note"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Check the form." };
+    return { error: parsed.error.issues[0]?.message ?? t.common.checkForm };
   }
   const d = parsed.data;
 
@@ -238,16 +247,16 @@ export async function attachPart(
     .from(machines)
     .where(eq(machines.id, d.machineId))
     .limit(1);
-  if (!machine) return { error: "That machine no longer exists." };
+  if (!machine) return { error: t.common.machineGone };
   if (machine.retiredAt)
-    return { error: "That machine is retired. You can't attach parts to it." };
+    return { error: t.machines.errRetiredAttach };
 
   const [part] = await db
     .select({ id: parts.id })
     .from(parts)
     .where(eq(parts.id, d.partId))
     .limit(1);
-  if (!part) return { error: "That part no longer exists." };
+  if (!part) return { error: t.workOrders.errPartGone };
 
   try {
     await db.insert(machineParts).values({
@@ -260,7 +269,7 @@ export async function attachPart(
     });
   } catch (e) {
     if (String(e).includes("UNIQUE")) {
-      return { error: "That part is already on this machine." };
+      return { error: t.machines.errPartAlreadyOn };
     }
     throw e;
   }

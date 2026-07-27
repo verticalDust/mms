@@ -4,6 +4,7 @@ import type { MouseEvent } from "react";
 import { useFormStatus } from "react-dom";
 import { Play, Check, Loader2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
+import { useT } from "@/lib/i18n/client";
 
 // One-tap Start / Done for the My-work list (E3-S4). The button doubles as the
 // status indicator: an open job shows Start, an in-progress job shows Done.
@@ -20,6 +21,7 @@ export function JobAction({
   confirmMessage?: string;
 }) {
   const { pending } = useFormStatus();
+  const t = useT();
   const done = kind === "done";
   const guard = (e: MouseEvent) => {
     if (confirmMessage && !window.confirm(confirmMessage)) e.preventDefault();
@@ -39,7 +41,7 @@ export function JobAction({
       ) : (
         <Play className="h-4 w-4" />
       )}
-      {done ? "Done" : "Start"}
+      {done ? t.myWork.doneShort : t.myWork.startShort}
     </button>
   );
 }

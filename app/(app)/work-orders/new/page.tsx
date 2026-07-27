@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { eq, isNull, asc } from "drizzle-orm";
@@ -5,9 +6,12 @@ import { requireAdmin } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { machines, users } from "@/lib/db/schema";
 import { getReport } from "@/lib/queries";
+import { getT } from "@/lib/i18n/server";
 import { WorkOrderForm } from "../work-order-form";
 
-export const metadata = { title: "New work order · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.newWorkOrder };
+}
 
 export default async function NewWorkOrderPage({
   searchParams,
@@ -15,6 +19,7 @@ export default async function NewWorkOrderPage({
   searchParams: Promise<{ machine?: string; fromReport?: string }>;
 }) {
   await requireAdmin();
+  const t = await getT();
   const { machine, fromReport } = await searchParams;
 
   // Triage → job (E5-S2): load the report and prefill. Only an untriaged report
@@ -39,7 +44,7 @@ export default async function NewWorkOrderPage({
     .orderBy(asc(users.name));
 
   const backHref = fromValidReport ? "/reports" : "/work-orders";
-  const backLabel = fromValidReport ? "Triage" : "Work orders";
+  const backLabel = fromValidReport ? t.nav.reports : t.nav.workOrders;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-5">
@@ -51,7 +56,7 @@ export default async function NewWorkOrderPage({
         {backLabel}
       </Link>
       <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-        {fromValidReport ? "Work order from report" : "New work order"}
+        {fromValidReport ? t.workOrders.fromReportTitle : t.workOrders.newWorkOrder}
       </h1>
       <div className="rounded-xl border border-slate-200 bg-white p-6">
         <WorkOrderForm

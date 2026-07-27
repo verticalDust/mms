@@ -6,12 +6,16 @@ import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { workOrders, machines, parts } from "@/lib/db/schema";
 import { listMachineParts, searchParts, stockLevel } from "@/lib/queries";
+import type { Metadata } from "next";
 import { Mono, EmptyState, buttonClass, SectionLabel } from "@/components/ui";
 import { StockStatusChip } from "@/components/status-chip";
 import { SearchFilterBar } from "@/components/search-filter-bar";
+import { getT } from "@/lib/i18n/server";
 import { AddPartToJobForm } from "./add-part-to-job-form";
 
-export const metadata = { title: "Add part to job · MMS" };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT()).meta.addPartToJob };
+}
 
 type PickRow = {
   id: number;
@@ -32,6 +36,7 @@ export default async function AddJobPartPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   await requireUser();
+  const t = await getT();
   const id = Number((await params).id);
   if (!Number.isInteger(id)) notFound();
   const sp = await searchParams;
@@ -80,10 +85,10 @@ export default async function AddJobPartPage({
             className="inline-flex items-center gap-1.5 text-[14px] text-slate-500 hover:text-slate-700"
           >
             <ArrowLeft className="h-4 w-4" />
-            Choose a different part
+            {t.workOrders.chooseDifferent}
           </Link>
           <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-            Add a part to WO-{wo.id}
+            {t.workOrders.addPartToWo(wo.id)}
           </h1>
           <div className="rounded-xl border border-slate-200 bg-white p-6">
             <div className="mb-5 flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
@@ -92,14 +97,14 @@ export default async function AddJobPartPage({
                 <div className="text-[15px] text-slate-900">{part.name}</div>
                 {part.binLocation && (
                   <div className="text-[13px] text-slate-500">
-                    bin <Mono>{part.binLocation}</Mono>
+                    {t.parts.bin} <Mono>{part.binLocation}</Mono>
                   </div>
                 )}
               </div>
               <div className="flex flex-col items-end gap-1">
                 <StockStatusChip level={stockLevel(part.onHand, part.minLevel)} />
                 <div className="text-[13px] text-slate-500">
-                  <Mono>{part.onHand}</Mono> {part.unit} on hand
+                  {t.parts.onHand(part.onHand, part.unit)}
                 </div>
               </div>
             </div>
@@ -128,7 +133,7 @@ export default async function AddJobPartPage({
     const raw = await searchParts({ q });
     capped = raw.length > PICK_CAP;
     results = (capped ? raw.slice(0, PICK_CAP) : raw).map(toPick);
-    heading = "Search results";
+    heading = t.parts.headingSearchResults;
   } else if (fitment.length) {
     results = fitment.map((p) => ({
       id: p.partId,
@@ -138,13 +143,13 @@ export default async function AddJobPartPage({
       onHand: p.onHand,
       stock: p.stock,
     }));
-    heading = "Suggested for this machine";
+    heading = t.parts.headingSuggestedMachine;
     suggested = true;
   } else {
     const raw = await searchParts();
     capped = raw.length > PICK_CAP;
     results = (capped ? raw.slice(0, PICK_CAP) : raw).map(toPick);
-    heading = "All parts";
+    heading = t.parts.headingAll;
   }
 
   return (
@@ -157,10 +162,10 @@ export default async function AddJobPartPage({
         WO-{wo.id} · {wo.title}
       </Link>
       <h1 className="font-condensed text-2xl font-semibold text-slate-900">
-        Add a part to WO-{wo.id}
+        {t.workOrders.addPartToWo(wo.id)}
       </h1>
 
-      <SearchFilterBar placeholder="Search SKU or name…" />
+      <SearchFilterBar placeholder={t.parts.searchSkuName} />
 
       {results.length === 0 ? (
         <EmptyState
@@ -171,11 +176,11 @@ export default async function AddJobPartPage({
               <Package className="h-6 w-6" />
             )
           }
-          title={q ? "No parts match your search." : "No parts in the catalog yet."}
+          title={q ? t.parts.noMatchSearch : t.parts.noneInCatalog}
           action={
             !q ? (
               <Link href="/parts/new" className={buttonClass("secondary")}>
-                Add a part to the catalog
+                {t.parts.addToCatalog}
               </Link>
             ) : undefined
           }
@@ -202,7 +207,7 @@ export default async function AddJobPartPage({
                   </div>
                   {p.binLocation && (
                     <div className="truncate text-[13px] text-slate-500">
-                      bin <Mono>{p.binLocation}</Mono>
+                      {t.parts.bin} <Mono>{p.binLocation}</Mono>
                     </div>
                   )}
                 </div>
@@ -213,12 +218,12 @@ export default async function AddJobPartPage({
           </div>
           {capped && (
             <p className="text-[13px] text-slate-500">
-              Showing the first {PICK_CAP}. Refine your search to narrow.
+              {t.parts.showingFirst(PICK_CAP)}
             </p>
           )}
           {suggested && (
             <p className="text-[13px] text-slate-500">
-              Need another part? Search the full catalog above.
+              {t.workOrders.needAnother}
             </p>
           )}
         </div>

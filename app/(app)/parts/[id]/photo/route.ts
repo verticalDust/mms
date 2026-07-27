@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { parts } from "@/lib/db/schema";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
 import { authorize } from "@/lib/auth/rbac";
+import { getT } from "@/lib/i18n/server";
 import {
   storePhoto,
   readPhoto,
@@ -57,38 +58,40 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  const t = await getT();
+  if (!user)
+    return NextResponse.json({ error: t.common.notSignedIn }, { status: 401 });
   try {
     authorize(user, "part:manage");
   } catch {
     return NextResponse.json(
-      { error: "Only an admin can change part photos." },
+      { error: t.photos.onlyAdminPartPhoto },
       { status: 403 },
     );
   }
   if (!photosEnabled())
-    return NextResponse.json(
-      { error: "Photo uploads aren't enabled in this deployment." },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: t.photos.disabled }, { status: 503 });
   const id = Number((await params).id);
   if (!Number.isInteger(id))
-    return NextResponse.json({ error: "Unknown part." }, { status: 400 });
+    return NextResponse.json({ error: t.parts.errUnknownPart }, { status: 400 });
 
   const form = await req.formData();
   const file = form.get("photo");
   if (!(file instanceof File))
-    return NextResponse.json({ error: "No image was sent." }, { status: 400 });
+    return NextResponse.json({ error: t.photos.noImage }, { status: 400 });
   if (!file.type.startsWith("image/"))
-    return NextResponse.json({ error: "That isn't an image." }, { status: 415 });
+    return NextResponse.json({ error: t.photos.notImage }, { status: 415 });
   if (file.size > MAX_BYTES)
-    return NextResponse.json({ error: "Image is too large." }, { status: 413 });
+    return NextResponse.json(
+      { error: t.photos.tooLarge(3) },
+      { status: 413 },
+    );
 
   const buf = Buffer.from(await file.arrayBuffer());
   if (!looksLikeImage(buf))
-    return NextResponse.json({ error: "That isn't a valid image." }, { status: 415 });
+    return NextResponse.json({ error: t.photos.notValid }, { status: 415 });
   if ((await photoRef(id)) === undefined)
-    return NextResponse.json({ error: "Unknown part." }, { status: 404 });
+    return NextResponse.json({ error: t.parts.errUnknownPart }, { status: 404 });
 
   const ref = await storePhoto(`parts/part-${id}.jpg`, buf);
   await db
@@ -105,22 +108,24 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  const t = await getT();
+  if (!user)
+    return NextResponse.json({ error: t.common.notSignedIn }, { status: 401 });
   try {
     authorize(user, "part:manage");
   } catch {
     return NextResponse.json(
-      { error: "Only an admin can change part photos." },
+      { error: t.photos.onlyAdminPartPhoto },
       { status: 403 },
     );
   }
   const id = Number((await params).id);
   if (!Number.isInteger(id))
-    return NextResponse.json({ error: "Unknown part." }, { status: 400 });
+    return NextResponse.json({ error: t.parts.errUnknownPart }, { status: 400 });
 
   const ref = await photoRef(id);
   if (ref === undefined)
-    return NextResponse.json({ error: "Unknown part." }, { status: 404 });
+    return NextResponse.json({ error: t.parts.errUnknownPart }, { status: 404 });
 
   if (ref) await deletePhoto(ref);
   await db

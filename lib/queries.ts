@@ -316,10 +316,10 @@ export async function listOverdueWorkOrders(
 
 // Active admins — the daily digest's recipients (E6-S3). One email each.
 export async function adminRecipients(): Promise<
-  { email: string; name: string }[]
+  { email: string; name: string; locale: "bg" | "en" }[]
 > {
   return db
-    .select({ email: users.email, name: users.name })
+    .select({ email: users.email, name: users.name, locale: users.locale })
     .from(users)
     .where(and(eq(users.role, "admin"), eq(users.active, true)))
     .orderBy(asc(users.name));
